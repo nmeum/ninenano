@@ -12,6 +12,7 @@ var ctlcmds = map[string]ServerReply{
 	"rversion_unknown":       {RversionUnknown, protocol.Tversion},
 	"rversion_msize_too_big": {RversionMsizeTooBig, protocol.Tversion},
 	"rversion_invalid":       {RversionInvalidVersion, protocol.Tversion},
+	"rversion_invalid_len":   {RversionInvalidLength, protocol.Tversion},
 }
 
 // Replies with the msize and version send by the client. This should always be
@@ -82,5 +83,26 @@ func RversionInvalidVersion(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRversionPkt(b, t, TMsize, "9P20009P2000")
+	return nil
+}
+
+// Replies with an length field in the version R-message.
+//
+// The value of the size field is one byte too short. Thereby causing
+// the length field of the version string to report a string size that
+// would exceeds the size of the packet itself.
+//
+// The client should not be able to parse this R-message.
+func RversionInvalidLength(b *bytes.Buffer) error {
+	TMsize, TVersion, t, err := protocol.UnmarshalTversionPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRversionPkt(b, t, TMsize, TVersion)
+
+	var len uint64 = uint64(b.Len()) - 1
+	copy(b.Bytes(), []byte{uint8(len)})
+
 	return nil
 }
