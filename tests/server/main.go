@@ -1,9 +1,17 @@
+// Package main implements a simple 9P server which can be used to test
+// 9P client implementations. It opens two TCP sockets on given ports.
+// The first socket is the control socket, the client must send a
+// test name delimited by a newline character to this socket before
+// connecting to the second socket (the 9P protocol socket).
+//
+// After sending the test name to the server the client can connect to
+// the 9P protocol socket. The server accepts T-messages on this port
+// and (depending on the test name) responses with R-messages.
 package main
 
 import (
 	"bufio"
 	"flag"
-	"github.com/Harvey-OS/ninep/protocol"
 	"log"
 	"net"
 )
@@ -12,11 +20,6 @@ var (
 	caddr = flag.String("ca", ":2342", "Control server network address")
 	paddr = flag.String("pa", ":4223", "9P server network address")
 )
-
-var ctlcmds = map[string]ServerReply{
-	"rversion_success": {RversionSuccess, protocol.Tversion},
-	"rversion_unknown": {RversionUnknown, protocol.Tversion},
-}
 
 func main() {
 	cl, err := net.Listen("tcp", *caddr)

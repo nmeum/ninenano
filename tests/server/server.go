@@ -8,12 +8,18 @@ import (
 	"io"
 )
 
+// Handles an incoming T-message send by the client.
 type ServerFunc func(*bytes.Buffer) error
+
+// Contains an expected T-message type and the function which should be
+// called when this type is encountered.
 type ServerReply struct {
 	fn ServerFunc
 	ty protocol.MType
 }
 
+// Variable which equals the ServerReply which should be used for the
+// next incoming T-message from the client.
 var reply ServerReply = ServerReply{
 	func(b *bytes.Buffer) error {
 		return errors.New("not implemented")
@@ -21,26 +27,9 @@ var reply ServerReply = ServerReply{
 	protocol.Tlast,
 }
 
-func RversionSuccess(b *bytes.Buffer) error {
-	TMsize, TVersion, t, err := protocol.UnmarshalTversionPkt(b)
-	if err != nil {
-		return err
-	}
-
-	protocol.MarshalRversionPkt(b, t, TMsize, TVersion)
-	return nil
-}
-
-func RversionUnknown(b *bytes.Buffer) error {
-	TMsize, _, t, err := protocol.UnmarshalTversionPkt(b)
-	if err != nil {
-		return err
-	}
-
-	protocol.MarshalRversionPkt(b, t, TMsize, "unknown")
-	return nil
-}
-
+// Creates a new ninep protocol server. The new server reads T-messages from
+// the given ReadCloser and writes R-messages to the given WriteCloser.
+// Debug information is created by calling the given tracer.
 func NewServer(d protocol.Tracer, t io.WriteCloser, f io.ReadCloser) *protocol.Server {
 	s := new(protocol.Server)
 	s.Trace = d
@@ -51,6 +40,11 @@ func NewServer(d protocol.Tracer, t io.WriteCloser, f io.ReadCloser) *protocol.S
 	return s
 }
 
+// Dispatches an incoming T-message using the current ServerReply. If a
+// server reply wasn't set or if the T-message send but the client
+// doesn't match the ServerReply message type an error is returned.
+// Besides an error may be returned if the current ServerReply handler
+// returns an error.
 func dispatch(s *protocol.Server, b *bytes.Buffer, t protocol.MType) error {
 	if reply.ty == protocol.Tlast {
 		return reply.fn(b)

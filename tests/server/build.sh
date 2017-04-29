@@ -8,4 +8,4 @@ if [ ! -d src ]; then
 fi
 
 cd src/github.com/nmeum/9RIOT
-go build
+go build -o server
