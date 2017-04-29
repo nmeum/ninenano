@@ -44,7 +44,7 @@ _9pinit(sock_tcp_ep_t remote)
 	random_init(xtimer_now().ticks32);
 
 	DEBUG("Connecting to TCP socket...\n");
-	if ((r = sock_tcp_connect(&sock, &remote, 2342, 0)))
+	if ((r = sock_tcp_connect(&sock, &remote, 0, SOCK_FLAGS_REUSE_EP)))
 		return r;
 
 	/* DEBUG("Establishing 9P connection with server...\n"); */
@@ -52,6 +52,16 @@ _9pinit(sock_tcp_ep_t remote)
 	/* 	return r; */
 
 	return 0;
+}
+
+/**
+ * Closes an existing 9P connection freeing all resources on the server
+ * and the client.
+ */
+void
+_9pclose(void)
+{
+	sock_tcp_disconnect(&sock);
 }
 
 /**

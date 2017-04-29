@@ -116,6 +116,8 @@ typedef struct {
 } _9ppkt;
 
 int _9pinit(sock_tcp_ep_t);
+void _9pclose(void);
+
 int _9pversion(void);
 
 /**
