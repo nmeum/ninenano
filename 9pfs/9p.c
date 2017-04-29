@@ -4,12 +4,12 @@
 
 #include "xtimer.h"
 #include "random.h"
-#include "9pfs.h"
+#include "fs/9fs.h"
 
 #define ENABLE_DEBUG (1)
 #include "debug.h"
 
-static int _9pversion(uint32_t);
+static int _9pversion(void);
 
 /**
  * Global static Buffer used for storing message specific parameters.
@@ -46,11 +46,11 @@ _9pinit(sock_tcp_ep_t remote)
 	random_init(xtimer_now().ticks32);
 
 	DEBUG("Connecting to TCP socket...\n");
-	if ((r = sock_tcp_connect(&sock, &remote, 2342, 0))) /* TODO Don't hardcode local port */
+	if ((r = sock_tcp_connect(&sock, &remote, 2342, 0)))
 		return r;
 
 	DEBUG("Establishing 9P connection with server...\n");
-	if ((r = _9pversion(_9P_MSIZE)))
+	if ((r = _9pversion()))
 		return r;
 
 	return 0;
@@ -191,10 +191,10 @@ _do9p(_9ppkt *t, _9ppkt *r)
  *   connection, and the client cannot issue any further requests until
  *   it has received the Rversion reply.
  *
- * The version parameter is always set to the value of `_9P_VERSION`.
- * TODO always set msize parameter to `_9P_MSIZE`.
+ * The version parameter is always set to the value of `_9P_VERSION`,
+ * the msize parameter on the other hand is always set to the value of
+ * `_9P_MSIZE`.
  *
- * @param m Msize to send as a message parameter to the client.
  * @return `0` on success.
  * @return `-EBADMSG` if the 9P message was invalid.
  * @return `-EMSGSIZE` if the server msize was greater than `_9P_MSIZE`.
@@ -202,7 +202,7 @@ _do9p(_9ppkt *t, _9ppkt *r)
  *   9P network protocol.
  */
 static int
-_9pversion(uint32_t m)
+_9pversion(void)
 {
 	int r;
 	char ver[8]; /* TODO no magic number */
@@ -216,7 +216,7 @@ _9pversion(uint32_t m)
 	 *   size[4] Tversion tag[2] msize[4] version[s]
 	 */
 	tver.type = Tversion;
-	bufpos = _htop32(bufpos, m);
+	bufpos = _htop32(bufpos, _9P_MSIZE);
 	bufpos = _pstring(bufpos, _9P_VERSION);
 	tver.len = bufpos - tver.buf;
 
@@ -241,7 +241,7 @@ _9pversion(uint32_t m)
 	 *   The server responds with its own maximum, msize, which must
 	 *   be less than or equal to the client's value.
 	 */
-	if (msize > m) {
+	if (msize > _9P_MSIZE) {
 		DEBUG("Servers msize is too large (%d)\n", msize);
 		return -EMSGSIZE;
 	}
