@@ -195,7 +195,7 @@ _pstring(uint8_t *buf, char *str)
  *
  * @param dest Pointer to memory location to store string in. The string
  *   will always be null-terminated unless an error has occured.
- * @param n Maximum amount of bytes to copy.
+ * @param n Size of the given buffer.
  * @param pkt 9P packet to read string from.
  * @return `0` on success.
  * @return `-1` on failure.
@@ -209,7 +209,7 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
 		return -1;
 	_ptoh16(&siz, pkt);
 
-	if (pkt->len < siz || siz > n)
+	if (pkt->len < siz || siz >= n)
 		return -1;
 
 	memcpy(dest, pkt->buf, siz);
