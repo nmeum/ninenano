@@ -4,7 +4,7 @@
 
 #include "xtimer.h"
 #include "random.h"
-#include "fs/9fs.h"
+#include "9pfs.h"
 
 #define ENABLE_DEBUG (1)
 #include "debug.h"
