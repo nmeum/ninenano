@@ -10,8 +10,6 @@
 
 #include "embUnit.h"
 
-#define REMOTE_ADDR "fe80::647e:10ff:fed7:926"
-
 /* TCP control socket */
 static sock_tcp_t ctlsock;
 
