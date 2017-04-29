@@ -1,3 +1,6 @@
 [submodule "tests/server/vendor/github.com/Harvey-OS/ninep"]
 	path = tests/server/vendor/github.com/Harvey-OS/ninep
 	url = git://github.com/Harvey-OS/ninep.git
+[submodule "RIOT"]
+	path = RIOT
+	url = git://github.com/RIOT-OS/RIOT.git
