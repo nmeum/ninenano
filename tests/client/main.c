@@ -10,7 +10,7 @@
 #include "net/ipv6/addr.h"
 #include "net/sock/tcp.h"
 
-#define REMOTE_ADDR "fe80::b1:dbff:fe67:fbac"
+#define REMOTE_ADDR "fe80::647e:10ff:fed7:926"
 
 static sock_tcp_t ctlsock;
 
@@ -37,7 +37,7 @@ main(void)
 	}
 
 	puts("Setting command on control server...");
-	if (sock_tcp_write(&ctlsock, "test_rversion_success", 21) < 0) {
+	if (sock_tcp_write(&ctlsock, "test_rversion_success\n", 22) < 0) {
 		puts("Could't write to control server");
 		return 1;
 	}

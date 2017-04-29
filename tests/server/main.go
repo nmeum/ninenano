@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"github.com/Harvey-OS/ninep/protocol"
-	"io/ioutil"
 	"log"
 	"net"
 )
@@ -34,16 +34,19 @@ func main() {
 			log.Printf("Accept: %v\n", err.Error())
 			continue
 		}
+		log.Println("New control server connection")
 
-		data, err := ioutil.ReadAll(cc)
+		data, err := bufio.NewReader(cc).ReadString('\n')
 		if err != nil {
 			log.Printf("ReadAll: %v\n", err.Error())
 			continue
 		}
 
-		req := string(data)
+		req := data[:len(data)-1]
+		log.Printf("Received control command %q\n", req)
+
 		if cmd, ok := ctlcmds[req]; !ok {
-			log.Printf("Unknown control command %q\n", req)
+			log.Println("Unknown control command")
 		} else {
 			reply = cmd
 		}
@@ -53,8 +56,9 @@ func main() {
 			log.Printf("Accept: %v\n", err.Error())
 			continue
 		}
+		log.Println("New protocol server connection")
 
-		serv := NewServer(pc, pc)
+		serv := NewServer(log.Printf, pc, pc)
 		serv.Start()
 	}
 }

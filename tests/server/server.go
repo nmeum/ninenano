@@ -31,8 +31,11 @@ func RversionSuccess(b *bytes.Buffer) error {
 	return nil
 }
 
-func NewServer(t io.WriteCloser, f io.ReadCloser) *protocol.Server {
+func NewServer(d protocol.Tracer, t io.WriteCloser, f io.ReadCloser) *protocol.Server {
 	s := new(protocol.Server)
+	s.Trace = d
+	s.FromNet = f
+	s.ToNet = t
 	s.Replies = make(chan protocol.RPCReply, protocol.NumTags)
 	s.D = dispatch
 	return s
