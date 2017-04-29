@@ -12,7 +12,14 @@
 
 #define REMOTE_ADDR "fe80::647e:10ff:fed7:926"
 
+/* TCP control socket */
 static sock_tcp_t ctlsock;
+
+/* Remote address for control socket */
+static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
+
+/* Remote address for 9P protocol socket */
+static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
 
 static void
 setcmd(char *cmd)
@@ -24,15 +31,6 @@ setcmd(char *cmd)
 static void
 set_up(void)
 {
-	sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY,
-		      cr = SOCK_IPV6_EP_ANY;
-
-	pr.port = PPORT;
-	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, REMOTE_ADDR);
-
-	cr.port = CPORT;
-	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, REMOTE_ADDR);
-
 	if (sock_tcp_connect(&ctlsock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0)
 		TEST_FAIL("Couldn't connect to control server");
 	if (_9pinit(pr))
@@ -101,6 +99,12 @@ main(void)
 {
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
+
+	pr.port = PPORT;
+	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, REMOTE_ADDR);
+
+	cr.port = CPORT;
+	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, REMOTE_ADDR);
 
 	TESTS_START();
 	TESTS_RUN(tests_9pfs_tests());
