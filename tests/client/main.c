@@ -27,9 +27,6 @@ set_up(void)
 	sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY,
 		      cr = SOCK_IPV6_EP_ANY;
 
-	puts("Waiting for address autoconfiguration...");
-	xtimer_sleep(3);
-
 	pr.port = PPORT;
 	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, REMOTE_ADDR);
 
@@ -102,6 +99,9 @@ Test
 int
 main(void)
 {
+	puts("Waiting for address autoconfiguration...");
+	xtimer_sleep(3);
+
 	TESTS_START();
 	TESTS_RUN(tests_9pfs_tests());
 	TESTS_END();

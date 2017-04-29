@@ -25,9 +25,7 @@ USEMODULE += lwip_sock_tcp
 USEMODULE += netdev_default
 USEMODULE += ps
 
-# include this for printing IP addresses
-USEMODULE += shell_commands
-
+# Module required for unit test functions
 USEMODULE += embunit
 
 include $(RIOTBASE)/Makefile.include
