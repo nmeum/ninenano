@@ -193,7 +193,8 @@ _pstring(uint8_t *buf, char *str)
  * The parameter `n` is a `uint16_t` value because the maximum length of
  * a 9P string is `2^16` since the length field consists of 2 bytes.
  *
- * @param dest Pointer to memory location to store string in.
+ * @param dest Pointer to memory location to store string in. The string
+ *   will always be null-terminated unless an error has occured.
  * @param n Maximum amount of bytes to copy.
  * @param pkt 9P packet to read string from.
  * @return `0` on success.

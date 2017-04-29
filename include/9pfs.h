@@ -43,6 +43,14 @@ enum {
 	 * as `header` in the comments.
 	 */
 	_9P_HEADSIZ = 7,
+
+	/**
+	 * Maximum length of a version string in a R-message. The
+	 * longest valid version string is the 7 characters `unknown`.
+	 * In addition to that we need to reserve one byte for the
+	 * nullbyte.
+	 */
+	_9P_VERLEN = 8,
 };
 
 /**

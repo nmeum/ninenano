@@ -30,7 +30,9 @@ static uint8_t buffer[_9P_MSIZE];
 static sock_tcp_t sock;
 
 /**
- * Initializes a 9P connection to the given 9P server.
+ * Initializes the 9P module. Among other things it opens a TCP socket
+ * but it does not initiate the connection with the server. This has to
+ * be done manually using the ::_9pversion and ::_9pattach functions.
  *
  * @param remote Remote address of the server to connect to.
  * @return `0` on success, on error a negatiive errno is returned.
@@ -46,10 +48,6 @@ _9pinit(sock_tcp_ep_t remote)
 	DEBUG("Connecting to TCP socket...\n");
 	if ((r = sock_tcp_connect(&sock, &remote, 0, SOCK_FLAGS_REUSE_EP)))
 		return r;
-
-	/* DEBUG("Establishing 9P connection with server...\n"); */
-	/* if ((r = _9pversion())) */
-	/* 	return r; */
 
 	return 0;
 }
@@ -213,7 +211,7 @@ int
 _9pversion(void)
 {
 	int r;
-	char ver[8]; /* TODO no magic number */
+	char ver[_9P_VERLEN];
 	uint8_t *bufpos;
 	uint32_t msize;
 	_9ppkt tver, rver;
@@ -259,7 +257,7 @@ _9pversion(void)
 	 *  string, it should respond with an Rversion message (not
 	 *  Rerror) with the version string the 7 characters `unknown`.
          */
-        if (_hstring(ver, 8, &rver))
+        if (_hstring(ver, _9P_VERLEN, &rver))
         	return -EBADMSG;
 
 	DEBUG("Version string reported by server: %s\n", ver);
