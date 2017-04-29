@@ -9,8 +9,6 @@
 #define ENABLE_DEBUG (1)
 #include "debug.h"
 
-static int _9pversion(void);
-
 /**
  * Global static Buffer used for storing message specific parameters.
  * Message indepented parameters are stored on the stack using `_9ppkt`.
@@ -49,9 +47,9 @@ _9pinit(sock_tcp_ep_t remote)
 	if ((r = sock_tcp_connect(&sock, &remote, 2342, 0)))
 		return r;
 
-	DEBUG("Establishing 9P connection with server...\n");
-	if ((r = _9pversion()))
-		return r;
+	/* DEBUG("Establishing 9P connection with server...\n"); */
+	/* if ((r = _9pversion())) */
+	/* 	return r; */
 
 	return 0;
 }
@@ -201,7 +199,7 @@ _do9p(_9ppkt *t, _9ppkt *r)
  * @return `-ENOPROTOOPT` server implements a different version of the
  *   9P network protocol.
  */
-static int
+int
 _9pversion(void)
 {
 	int r;

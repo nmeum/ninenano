@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "9pfs.h"
 #include "xtimer.h"
 
@@ -10,14 +8,22 @@
 #include "net/ipv6/addr.h"
 #include "net/sock/tcp.h"
 
+#include "embUnit.h"
+
 #define REMOTE_ADDR "fe80::647e:10ff:fed7:926"
 
 static sock_tcp_t ctlsock;
 
-int
-main(void)
+static void
+setcmd(char *cmd)
 {
-	int r;
+	if (sock_tcp_write(&ctlsock, cmd, strlen(cmd)) < 0)
+		TEST_FAIL("Couldn't write to control server");
+}
+
+static void
+set_up(void)
+{
 	sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY,
 		      cr = SOCK_IPV6_EP_ANY;
 
@@ -30,20 +36,50 @@ main(void)
 	cr.port = CPORT;
 	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, REMOTE_ADDR);
 
-	puts("Connecting to control server...");
-	if (sock_tcp_connect(&ctlsock, &cr, 0, 0) < 0) {
-		puts("Couldn't connect to control server");
-		return 1;
-	}
+	if (sock_tcp_connect(&ctlsock, &cr, 0, 0) < 0)
+		TEST_FAIL("Couldn't connect to control server");
+	if (_9pinit(pr))
+		TEST_FAIL("_9pinit failed");
+}
 
-	puts("Setting command on control server...");
-	if (sock_tcp_write(&ctlsock, "test_rversion_success\n", 22) < 0) {
-		puts("Could't write to control server");
-		return 1;
-	}
+static void
+tear_down(void)
+{
+	sock_tcp_disconnect(&ctlsock);
+}
 
-	if ((r = _9pinit(pr)))
-		return EXIT_FAILURE;
+static void
+test_9pfs__rversion_success(void)
+{
+	setcmd("rversion_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9pversion());
+}
 
-	return EXIT_SUCCESS;
+/* static void */
+/* test_9pfs__rversion_unknown(void) */
+/* { */
+/* 	setcmd("rversion_unknown\n"); */
+/* 	TEST_ASSERT_EQUAL_INT(-ENOPROTOOPT, _9pversion()); */
+/* } */
+
+Test
+*tests_9pfs_tests(void)
+{
+	EMB_UNIT_TESTFIXTURES(fixtures) {
+		new_TestFixture(test_9pfs__rversion_success),
+		/* new_TestFixture(test_9pfs__rversion_unknown), */
+	};
+
+	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
+	return (Test*)&_9pfs_tests;
+}
+
+int
+main(void)
+{
+	TESTS_START();
+	TESTS_RUN(tests_9pfs_tests());
+	TESTS_END();
+
+	return 0;
 }

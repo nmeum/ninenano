@@ -31,6 +31,16 @@ func RversionSuccess(b *bytes.Buffer) error {
 	return nil
 }
 
+func RversionUnknown(b *bytes.Buffer) error {
+	TMsize, _, t, err := protocol.UnmarshalTversionPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRversionPkt(b, t, TMsize, "unknown")
+	return nil
+}
+
 func NewServer(d protocol.Tracer, t io.WriteCloser, f io.ReadCloser) *protocol.Server {
 	s := new(protocol.Server)
 	s.Trace = d

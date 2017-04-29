@@ -14,7 +14,8 @@ var (
 )
 
 var ctlcmds = map[string]ServerReply{
-	"test_rversion_success": {RversionSuccess, protocol.Tversion},
+	"rversion_success": {RversionSuccess, protocol.Tversion},
+	"rversion_unknown": {RversionUnknown, protocol.Tversion},
 }
 
 func main() {

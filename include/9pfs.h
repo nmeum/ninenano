@@ -116,6 +116,7 @@ typedef struct {
 } _9ppkt;
 
 int _9pinit(sock_tcp_ep_t);
+int _9pversion(void);
 
 /**
  * Enum defining sizes of 8..64 bit fields in bytes.

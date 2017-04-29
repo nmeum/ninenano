@@ -28,4 +28,6 @@ USEMODULE += ps
 # include this for printing IP addresses
 USEMODULE += shell_commands
 
+USEMODULE += embunit
+
 include $(RIOTBASE)/Makefile.include
