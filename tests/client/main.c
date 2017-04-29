@@ -63,12 +63,20 @@ test_9pfs__rversion_unknown(void)
 	TEST_ASSERT_EQUAL_INT(-ENOPROTOOPT, _9pversion());
 }
 
+static void
+test_9pfs__rversion_msize_too_big(void)
+{
+	setcmd("rversion_msize_too_big\n");
+	TEST_ASSERT_EQUAL_INT(-EMSGSIZE, _9pversion());
+}
+
 Test
 *tests_9pfs_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9pfs__rversion_success),
 		new_TestFixture(test_9pfs__rversion_unknown),
+		new_TestFixture(test_9pfs__rversion_msize_too_big),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
