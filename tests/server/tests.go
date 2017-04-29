@@ -8,11 +8,12 @@ import (
 // Maps strings written by the client to the control socket to
 // server replies. Every test function needs an entry in this table.
 var ctlcmds = map[string]ServerReply{
-	"rversion_success":       {RversionSuccess, protocol.Tversion},
-	"rversion_unknown":       {RversionUnknown, protocol.Tversion},
-	"rversion_msize_too_big": {RversionMsizeTooBig, protocol.Tversion},
-	"rversion_invalid":       {RversionInvalidVersion, protocol.Tversion},
-	"rversion_invalid_len":   {RversionInvalidLength, protocol.Tversion},
+	"rversion_success":          {RversionSuccess, protocol.Tversion},
+	"rversion_unknown":          {RversionUnknown, protocol.Tversion},
+	"rversion_msize_too_big":    {RversionMsizeTooBig, protocol.Tversion},
+	"rversion_invalid":          {RversionInvalidVersion, protocol.Tversion},
+	"rversion_invalid_len":      {RversionInvalidLength, protocol.Tversion},
+	"rversion_version_too_long": {RversionVersionTooLong, protocol.Tversion},
 }
 
 // Replies with the msize and version send by the client. This should always be
@@ -104,5 +105,20 @@ func RversionInvalidLength(b *bytes.Buffer) error {
 	var len uint64 = uint64(b.Len()) - 1
 	copy(b.Bytes(), []byte{uint8(len)})
 
+	return nil
+}
+
+// Replies with a version string that is one byte longer than the
+// longest valid version string `unknown`.
+//
+// The client will most likely be able to parse this messages but might
+// reject it if it exceeds a statically allocated buffer.
+func RversionVersionTooLong(b *bytes.Buffer) error {
+	TMsize, _, t, err := protocol.UnmarshalTversionPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRversionPkt(b, t, TMsize, "12345678")
 	return nil
 }

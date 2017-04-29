@@ -79,6 +79,13 @@ test_9pfs__rversion_invalid_len(void)
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
+static void
+test_9pfs__rversion_version_too_long(void)
+{
+	setcmd("rversion_version_too_long\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+}
+
 Test
 *tests_9pfs_tests(void)
 {
@@ -88,6 +95,7 @@ Test
 		new_TestFixture(test_9pfs__rversion_msize_too_big),
 		new_TestFixture(test_9pfs__rversion_invalid),
 		new_TestFixture(test_9pfs__rversion_invalid_len),
+		new_TestFixture(test_9pfs__rversion_version_too_long),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
