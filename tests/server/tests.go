@@ -11,6 +11,7 @@ var ctlcmds = map[string]ServerReply{
 	"rversion_success":       {RversionSuccess, protocol.Tversion},
 	"rversion_unknown":       {RversionUnknown, protocol.Tversion},
 	"rversion_msize_too_big": {RversionMsizeTooBig, protocol.Tversion},
+	"rversion_invalid":       {RversionInvalidVersion, protocol.Tversion},
 }
 
 // Replies with the msize and version send by the client. This should always be
@@ -33,8 +34,8 @@ func RversionSuccess(b *bytes.Buffer) error {
 //   Rerror) with the version string the 7 characters
 //   ``unknown''.
 //
-// The client should therefore be able to parse this message but should return
-// an error. The msize will be set to the value specified by the client.
+// The client should therefore be able to parse this message but should
+// return an error.
 func RversionUnknown(b *bytes.Buffer) error {
 	TMsize, _, t, err := protocol.UnmarshalTversionPkt(b)
 	if err != nil {
@@ -53,8 +54,7 @@ func RversionUnknown(b *bytes.Buffer) error {
 //   be less than or equal to the client's value.
 //
 // The client should therefore be able to parse this message but should
-// return an error. The version will be set to the value specified by
-// the client.
+// return an error.
 func RversionMsizeTooBig(b *bytes.Buffer) error {
 	TMsize, TVersion, t, err := protocol.UnmarshalTversionPkt(b)
 	if err != nil {
@@ -62,5 +62,25 @@ func RversionMsizeTooBig(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRversionPkt(b, t, TMsize+1, TVersion)
+	return nil
+}
+
+// Replies with an invalid version string.
+//
+// From version(5):
+//  After stripping any such period-separated suffix, the server is
+//  allowed to respond with a string of the form 9Pnnnn, where nnnn is
+//  less than or equal to the digits sent by the client.
+//
+// Depending on the client implementation the client may not be able to
+// parse the R-message. In any case it should return an error since the
+// he shouldn't support this version of the 9P protocol.
+func RversionInvalidVersion(b *bytes.Buffer) error {
+	TMsize, _, t, err := protocol.UnmarshalTversionPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRversionPkt(b, t, TMsize, "9P20009P2000")
 	return nil
 }
