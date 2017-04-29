@@ -19,6 +19,16 @@ static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
 /* Remote address for 9P protocol socket */
 static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
 
+/**
+ * You might be wondering why there are no comments below this points.
+ * This is the case because the purpose of the various test cases is
+ * explained in the file `tests/server/tests.go` instead.
+ *
+ * Please refer to that file if you seek more information about the
+ * various test cases. The test cases just act as stupid TCP clients,
+ * the interessting stuff happens on the server side.
+ */
+
 static void
 setcmd(char *cmd)
 {
