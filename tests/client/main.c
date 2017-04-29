@@ -36,7 +36,7 @@ set_up(void)
 	cr.port = CPORT;
 	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, REMOTE_ADDR);
 
-	if (sock_tcp_connect(&ctlsock, &cr, 0, 0) < 0)
+	if (sock_tcp_connect(&ctlsock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0)
 		TEST_FAIL("Couldn't connect to control server");
 	if (_9pinit(pr))
 		TEST_FAIL("_9pinit failed");
@@ -45,6 +45,7 @@ set_up(void)
 static void
 tear_down(void)
 {
+	_9pclose();
 	sock_tcp_disconnect(&ctlsock);
 }
 
@@ -55,19 +56,19 @@ test_9pfs__rversion_success(void)
 	TEST_ASSERT_EQUAL_INT(0, _9pversion());
 }
 
-/* static void */
-/* test_9pfs__rversion_unknown(void) */
-/* { */
-/* 	setcmd("rversion_unknown\n"); */
-/* 	TEST_ASSERT_EQUAL_INT(-ENOPROTOOPT, _9pversion()); */
-/* } */
+static void
+test_9pfs__rversion_unknown(void)
+{
+	setcmd("rversion_unknown\n");
+	TEST_ASSERT_EQUAL_INT(-ENOPROTOOPT, _9pversion());
+}
 
 Test
 *tests_9pfs_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9pfs__rversion_success),
-		/* new_TestFixture(test_9pfs__rversion_unknown), */
+		new_TestFixture(test_9pfs__rversion_unknown),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
