@@ -110,6 +110,13 @@ test_9pfs__rattach_success(void)
 	TEST_ASSERT(fid->fid > 0);
 }
 
+static void
+test_9pfs__ratach_invalid_len(void)
+{
+	setcmd("rattach_invalid_len\n");
+	TEST_ASSERT_NULL(_9pattach("foobar", NULL));
+}
+
 Test
 *tests_9pfs_tests(void)
 {
@@ -121,6 +128,7 @@ Test
 		new_TestFixture(test_9pfs__rversion_invalid_len),
 		new_TestFixture(test_9pfs__rversion_version_too_long),
 		new_TestFixture(test_9pfs__rattach_success),
+		new_TestFixture(test_9pfs__ratach_invalid_len),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);

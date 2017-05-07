@@ -15,7 +15,8 @@ var ctlcmds = map[string]ServerReply{
 	"rversion_invalid_len":      {RversionInvalidLength, protocol.Tversion},
 	"rversion_version_too_long": {RversionVersionTooLong, protocol.Tversion},
 
-	"rattach_success": {RattachSuccess, protocol.Tattach},
+	"rattach_success":     {RattachSuccess, protocol.Tattach},
+	"rattach_invalid_len": {RattachInvalidLength, protocol.Tattach},
 }
 
 // Replies with the msize and version send by the client. This should always be
@@ -133,11 +134,23 @@ func RattachSuccess(b *bytes.Buffer) error {
 		return err
 	}
 
-	// QID, err := s.NS.Rattach(SFID, AFID, Uname, Aname)
-	// if err != nil {
-	// 	return err
-	// }
+	protocol.MarshalRattachPkt(b, t, protocol.QID{})
+	return nil
+}
+
+// Replies with a modified packet length field causing the packet length
+// to be one byte shorter than neccessary. The client should not be able
+// to parse this.
+func RattachInvalidLength(b *bytes.Buffer) error {
+	_, _, _, _, t, err := protocol.UnmarshalTattachPkt(b)
+	if err != nil {
+		return err
+	}
 
 	protocol.MarshalRattachPkt(b, t, protocol.QID{})
+
+	var l uint64 = uint64(b.Len()) - 1
+	copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+
 	return nil
 }
