@@ -238,7 +238,7 @@ int _9pinit(sock_tcp_ep_t);
 void _9pclose(void);
 
 int _9pversion(void);
-int _9pattach(char*, char*);
+_9pfid* _9pattach(char*, char*);
 
 _9pfid* _fidtbl(uint32_t, _9pfidop);
 

@@ -97,11 +97,17 @@ test_9pfs__rversion_version_too_long(void)
 static void
 test_9pfs__rattach_success(void)
 {
+	_9pfid *fid;
+
 	setcmd("rversion_success\n");
 	_9pversion();
 
 	setcmd("rattach_success\n");
-	TEST_ASSERT_EQUAL_INT(0, _9pattach("foo", NULL));
+	fid = _9pattach("foo", NULL);
+
+	TEST_ASSERT_NOT_NULL(fid);
+	TEST_ASSERT_EQUAL_STRING("", fid->path);
+	TEST_ASSERT(fid->fid > 0);
 }
 
 Test

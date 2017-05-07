@@ -279,9 +279,10 @@ _9pversion(void)
  *
  * @param uname User identification.
  * @param aname File tree to access.
- * @return `0` on success, on error a negative errno is returned.
+ * @return Pointer to the location of the fib table entry associated
+ *   with the qid returned by the server or NULL on failure.
  */
-int
+_9pfid*
 _9pattach(char *uname, char *aname)
 {
 	int r;
@@ -302,18 +303,18 @@ _9pattach(char *uname, char *aname)
 
 	tatt.len = bufpos - tatt.buf;
 	if ((r = _do9p(&tatt, &ratt)))
-		return r;
+		return NULL;
 
 	/* From intro(5):
 	 *   size[4] Rattach tag[2] qid[13]
 	 */
 	if (!(fid = _fidtbl(_9P_ROOTFID, ADD)))
-		return -ENOBUFS;
+		return NULL;
 	fid->fid = _9P_ROOTFID;
 
 	fid->path = "";
 	if (_hqid(&fid->qid, &ratt))
-		return -EBADMSG;
+		return NULL;
 
-	return 0;
+	return fid;
 }
