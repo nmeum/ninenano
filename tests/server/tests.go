@@ -14,6 +14,8 @@ var ctlcmds = map[string]ServerReply{
 	"rversion_invalid":          {RversionInvalidVersion, protocol.Tversion},
 	"rversion_invalid_len":      {RversionInvalidLength, protocol.Tversion},
 	"rversion_version_too_long": {RversionVersionTooLong, protocol.Tversion},
+
+	"rattach_success": {RattachSuccess, protocol.Tattach},
 }
 
 // Replies with the msize and version send by the client. This should always be
@@ -120,5 +122,22 @@ func RversionVersionTooLong(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRversionPkt(b, t, TMsize, "12345678")
+	return nil
+}
+
+// Successfully attaches the client. Replying with a vaild qid. The
+// client should be able to parse this successfully.
+func RattachSuccess(b *bytes.Buffer) error {
+	_, _, _, _, t, err := protocol.UnmarshalTattachPkt(b)
+	if err != nil {
+		return err
+	}
+
+	// QID, err := s.NS.Rattach(SFID, AFID, Uname, Aname)
+	// if err != nil {
+	// 	return err
+	// }
+
+	protocol.MarshalRattachPkt(b, t, protocol.QID{})
 	return nil
 }

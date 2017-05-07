@@ -18,6 +18,14 @@ Usage
 
 TODO
 
+Roadmap
+=======
+
+* [ ] Refactor Documentation
+* [ ] s/char/unsiged char/
+* [ ] Write tests for _9pheader
+* [ ] Implement missing message types
+
 License
 =======
 

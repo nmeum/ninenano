@@ -16,26 +16,67 @@
 
 /**
  * From version(5):
- *   The client suggests a maximum message size, msize, that is
- *   the maximum length, in bytes, it will ever generate or
- *   expect to receive in a single 9P message.
+ *   The client suggests a maximum message size, msize, that is the
+ *   maximum length, in bytes, it will ever generate or expect to
+ *   receive in a single 9P message.
  */
 #ifndef _9P_MSIZE
   #define _9P_MSIZE 8192
 #endif
 
 /**
+ * From intro(5):
+ *   Most T-messages contain a fid, a 32-bit unsigned integer that the
+ *   client uses to identify a ``current file'' on the server. Fids are
+ *   somewhat like file descriptors in a user process, [...] all files
+ *   being manipulated by the operating system - are identified by fids.
+ *
+ * From intro(5):
+ *   Replies (R-messages) to auth, attach, walk, open, and create
+ *   requests convey a qid field back to the client. The qid represents
+ *   the server's unique identification for the file being accessed: two
+ *   files on the same server hierarchy are the same if and only if
+ *   their qids are the same.
+ *
+ * We need to map fids to qids, we do this using a primitve hash table
+ * implementation. The amount of maximum entries in this hash table can
+ * be tweaked by defining this macro.
+ */
+#ifndef _9P_MAXFIDS
+  #define _9P_MAXFIDS 256
+#endif
+
+/**
+ * From intro(5):
+ *   An exception is the tag NOTAG, defined as (ushort)~0 in <fcall.h>:
+ *   the client can use it, when establishing a connection, to override
+ *   tag matching in version messages.
+ */
+#define _9P_NOTAG (uint16_t)~0
+
+/**
+ * From attach(5):
+ *   If the client does not wish to authenticate the connection, or
+ *   knows that authentication is not required, the afid field in the
+ *   attach message should be set to NOFID, defined as (u32int)~0 in
+ *   <fcall.h>.
+ */
+#define _9P_NOFID (uint32_t)~0
+
+/**
+ * Enum defining sizes of 8..64 bit fields in bytes.
+ */
+enum {
+	BIT8SZ  = 1, /**< Size of 8 bit field in bytes. */
+	BIT16SZ = 2, /**< Size of 16 bit field in bytes. */
+	BIT32SZ = 4, /**< Size of 32 bit field in bytes. */
+	BIT64SZ = 8, /**< Size of 64 bit field in bytes. */
+};
+
+/**
  * Enum defining various global variables.
  */
 enum {
-	/**
-	 * From intro(5):
-	 *   An exception is the tag NOTAG, defined as (ushort)~0
-	 *   in <fcall.h>: the client can use it, when establishing a
-	 *   connection, to override tag matching in version messages.
-	 */
-	_9P_NOTAG = ~0,
-
 	/**
 	 * Size of the 9P packet header. Actually intro(5) never mention a
 	 * header but the first 7 byte of every valid 9P message are always the
@@ -45,12 +86,24 @@ enum {
 	_9P_HEADSIZ = 7,
 
 	/**
+	 * Size of a qid consisting of one one-byte field, one four-byte
+	 * field and one eight-byte field.
+	 */
+	_9P_QIDSIZ = BIT8SZ + BIT32SZ + BIT64SZ,
+
+	/**
 	 * Maximum length of a version string in a R-message. The
 	 * longest valid version string is the 7 characters `unknown`.
-	 * In addition to that we need to reserve one byte for the
+	 * In addition to that we need to reserve one-byte for the
 	 * nullbyte.
 	 */
 	_9P_VERLEN = 8,
+
+	/**
+	 * Used in the ::_9pattach function to identify the root
+	 * directory of the desired file tree.
+	 */
+	_9P_ROOTFID = 1,
 };
 
 /**
@@ -91,6 +144,64 @@ typedef enum {
 } _9ptype;
 
 /**
+ * Enum defining operating which should be performed on the fid table.
+ */
+typedef enum {
+	ADD, /**< Add the given fid to the table. */
+	GET, /**< Get the given fid from the table. */
+	DEL, /**< Delete the given fid from the table. */
+} _9pfidop;
+
+/**
+ * Struct representing a qid.
+ *
+ *  From intro(5):
+ *   The thirteen-byte qid fields hold a one-byte type, specifying
+ *   whether the file is a directory, append-only file, etc., and two
+ *   unsigned integers: first the four-byte qid version, then the eight-
+ *   byte qid path.
+ */
+typedef struct {
+	/**
+	 * From intro(5):
+	 *   [...] Whether the file is a directory, append-only file,
+	 *   etc. [...]
+	 */
+	uint8_t type;
+
+	/**
+	 * From intro(5):
+	 *   The version is a version number for a file; typically, it
+	 *   is incremented every time the file is modified.
+	 */
+	uint32_t ver;
+
+	/**
+	 * From intro(5):
+	 *   The path is an integer unique among all files in the
+	 *   hierarchy. If a file is deleted and recreated with the same
+	 *   name in the same directory, the old and new path components
+	 *   of the qids should be different.
+	 */
+	uint64_t path;
+} _9pqid;
+
+/**
+ * Struct representing an open fid.
+ *
+ * From intro(5):
+ *   Most T-messages contain a fid, a 32-bit unsigned integer that the
+ *   client uses to identify a ``current file'' on the server. Fids are
+ *   somewhat like file descriptors in a user process, [...] all files
+ *   being manipulated by the operating system - are identified by fids.
+ */
+typedef struct {
+	char *path;   /**< Path of this fid on the server. */
+	uint32_t fid; /**< The 32-bit unsigned integer representation of this fid. */
+	_9pqid qid;   /**< The qid associated with this fid. */
+} _9pfid;
+
+/**
  * Struct representing a 9P package. For the sake of simplicity it only
  * has length, tag and type fields since those are the only fields
  * present in all 9P messages. Message specific parameters have to be
@@ -127,19 +238,14 @@ int _9pinit(sock_tcp_ep_t);
 void _9pclose(void);
 
 int _9pversion(void);
+int _9pattach(char*, char*);
 
-/**
- * Enum defining sizes of 8..64 bit fields in bytes.
- */
-enum {
-	BIT8SZ  = 1, /**< Size of 8 bit field in bytes. */
-	BIT16SZ = 2, /**< Size of 16 bit field in bytes. */
-	BIT32SZ = 4, /**< Size of 32 bit field in bytes. */
-	BIT64SZ = 8, /**< Size of 64 bit field in bytes. */
-};
+_9pfid* _fidtbl(uint32_t, _9pfidop);
 
 uint8_t* _pstring(uint8_t*, char*);
 int _hstring(char*, uint16_t, _9ppkt*);
+
+int _hqid(_9pqid*, _9ppkt*);
 
 uint8_t* _htop8(uint8_t*, uint8_t);
 uint8_t* _htop16(uint8_t*, uint16_t);

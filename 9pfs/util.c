@@ -3,6 +3,53 @@
 #include "9pfs.h"
 
 /**
+ * As with file descriptors, we need to store currently open fids
+ * somehow. This is done in this static buffer.
+ */
+static _9pfid fids[_9P_MAXFIDS];
+
+/**
+ * This function can be used to add, get and delete fids.
+ *
+ * @pre fid != 0
+ * @param fid A 32-bit unsigned integer that the client uses to identify
+ *   a `current file` on the server.
+ * @param op Operating which should be performed for the given fid on
+ *   the fid table.
+ * @return On success a pointer to a fid in the fid table is returned,
+ *   on failure a NULL pointer is returned instead.
+ */
+_9pfid*
+_fidtbl(uint32_t fid, _9pfidop op)
+{
+	_9pfid *ret;
+	size_t i, hash;
+
+	/* A value of 0 is used to indicate an unused table entry. */
+	assert(fid != 0);
+	if (op == ADD)
+		fid = 0;
+
+	hash = i = fid % _9P_MAXFIDS;
+	do {
+		if ((ret = &fids[i])->fid == fid)
+			break;
+
+		i = (i + 1) % _9P_MAXFIDS;
+	} while (i != hash);
+
+	if (ret->fid != fid)
+		return NULL;
+	if (op == DEL) {
+		if (ret->fid == _9P_ROOTFID)
+			return NULL;
+		ret->fid = 0;
+	}
+
+	return ret;
+}
+
+/**
  * From intro(5):
  *   Each message consists of a sequence of bytes. Two-, four-, and
  *   eight-byte fields hold unsigned integers represented in
@@ -67,7 +114,7 @@ _htop32(uint8_t *buf, uint32_t val)
 uint8_t*
 _htop64(uint8_t *buf, uint64_t val)
 {
-	val = _9p_swap(val, l);
+	val = _9p_swap(val, ll);
 	memcpy(buf, &val, BIT64SZ);
 
 	buf += BIT64SZ;
@@ -164,7 +211,7 @@ _pstring(uint8_t *buf, char *str)
 		siz = _9p_swap(0, s);
 		memcpy(buf, &siz, BIT16SZ);
 		buf += BIT16SZ;
-		return 0;
+		return buf;
 	}
 
 	len = strlen(str);
@@ -177,8 +224,8 @@ _pstring(uint8_t *buf, char *str)
 }
 
 /**
- * This function converts a string as represented by the host to a
- * string as represented by the protocol.
+ * This function converts a string as represented by the protocol to a
+ * string as represented by the host.
  *
  * From intro(5):
  *   The notation string[s] (using a literal s character) is shorthand
@@ -217,6 +264,33 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
 
 	pkt->buf += siz;
 	pkt->len -= siz;
+
+	return 0;
+}
+
+/**
+ * From intro(5):
+ *   The thirteen-byte qid fields hold a one-byte type, specifying
+ *   whether the file is a directory, append-only file, etc., and two
+ *   unsigned integers: first the four-byte qid version, then the eight-
+ *   byte qid path.
+ *
+ * This function converts such a qid representation to a _9pqid struct.
+ *
+ * @param Pointer to a allocated _9pqid struct.
+ * @param pkt 9P packet to read qid from.
+ * @return `0` on success.
+ * @return `-1` on failure.
+ */
+int
+_hqid(_9pqid *dest, _9ppkt *pkt)
+{
+	if (pkt->len < _9P_QIDSIZ)
+		return -1;
+
+	_ptoh8(&dest->type, pkt);
+	_ptoh32(&dest->ver, pkt);
+	_ptoh64(&dest->path, pkt);
 
 	return 0;
 }

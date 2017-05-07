@@ -10,7 +10,7 @@
 #include "debug.h"
 
 /**
- * Global static Buffer used for storing message specific parameters.
+ * Global static buffer used for storing message specific parameters.
  * Message indepented parameters are stored on the stack using `_9ppkt`.
  *
  * The functions writting to this buffer `_htop{8,16, 32, 64}` and so
@@ -35,7 +35,7 @@ static sock_tcp_t sock;
  * be done manually using the ::_9pversion and ::_9pattach functions.
  *
  * @param remote Remote address of the server to connect to.
- * @return `0` on success, on error a negatiive errno is returned.
+ * @return `0` on success, on error a negative errno is returned.
  */
 int
 _9pinit(sock_tcp_ep_t remote)
@@ -152,7 +152,7 @@ _do9p(_9ppkt *t, _9ppkt *r)
 	 *   The tag should be NOTAG (value (ushort)~0) for a version message.
 	 */
 	t->tag = (t->type == Tversion) ?
-		(uint16_t)_9P_NOTAG : random_uint32();
+		_9P_NOTAG : random_uint32();
 
 	/* Build the "header", meaning: size[4] type[1] tag[2]
 	 * Every 9P message needs those first 7 bytes. */
@@ -224,8 +224,8 @@ _9pversion(void)
 	tver.type = Tversion;
 	bufpos = _htop32(bufpos, _9P_MSIZE);
 	bufpos = _pstring(bufpos, _9P_VERSION);
-	tver.len = bufpos - tver.buf;
 
+	tver.len = bufpos - tver.buf;
 	if ((r = _do9p(&tver, &rver)))
 		return r;
 
@@ -263,6 +263,57 @@ _9pversion(void)
 	DEBUG("Version string reported by server: %s\n", ver);
 	if (!strcmp(ver, "unknown"))
 		return -ENOPROTOOPT;
+
+	return 0;
+}
+
+/**
+ * From attach(5):
+ *   The attach message serves as a fresh introduction from a user on
+ *   the client machine to the server. As a result of the attach
+ *   transaction, the client will have a connection to the root
+ *   directory of the desired file tree, represented by fid.
+ *
+ * The afid parameter is always set to the value of `_9P_NOFID` since
+ * authentication is not supported currently.
+ *
+ * @param uname User identification.
+ * @param aname File tree to access.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+int
+_9pattach(char *uname, char *aname)
+{
+	int r;
+	uint8_t *bufpos;
+	_9pfid *fid;
+	_9ppkt tatt, ratt;
+
+	bufpos = tatt.buf = buffer;
+
+	/* From intro(5):
+	 *   size[4] Tattach tag[2] fid[4] afid[4] uname[s] aname[s]
+	 */
+	tatt.type = Tattach;
+	bufpos = _htop32(bufpos, _9P_ROOTFID);
+	bufpos = _htop32(bufpos, _9P_NOFID);
+	bufpos = _pstring(bufpos, uname);
+	bufpos = _pstring(bufpos, aname);
+
+	tatt.len = bufpos - tatt.buf;
+	if ((r = _do9p(&tatt, &ratt)))
+		return r;
+
+	/* From intro(5):
+	 *   size[4] Rattach tag[2] qid[13]
+	 */
+	if (!(fid = _fidtbl(_9P_ROOTFID, ADD)))
+		return -ENOBUFS;
+	fid->fid = _9P_ROOTFID;
+
+	fid->path = "";
+	if (_hqid(&fid->qid, &ratt))
+		return -EBADMSG;
 
 	return 0;
 }
