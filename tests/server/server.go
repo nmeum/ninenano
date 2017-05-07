@@ -18,14 +18,20 @@ type ServerReply struct {
 	ty protocol.MType
 }
 
-// Variable which equals the ServerReply which should be used for the
-// next incoming T-message from the client.
-var reply ServerReply = ServerReply{
+// Reply which should be used when an unknown control command was read
+// from the control socket.
+var failureReply ServerReply = ServerReply{
 	func(b *bytes.Buffer) error {
 		return errors.New("not implemented")
 	},
 	protocol.Tlast,
 }
+
+// Channel containing the reply to be used by the protocol connection
+// handler. The goal is to make sure that the protocol connection
+// handler doesn't access it before it has been set by the control
+// connection handler.
+var replyChan = make(chan ServerReply)
 
 // Creates a new ninep protocol server. The new server reads T-messages from
 // the given ReadCloser and writes R-messages to the given WriteCloser.
@@ -46,6 +52,7 @@ func NewServer(d protocol.Tracer, t io.WriteCloser, f io.ReadCloser) *protocol.S
 // Besides an error may be returned if the current ServerReply handler
 // returns an error.
 func dispatch(s *protocol.Server, b *bytes.Buffer, t protocol.MType) error {
+	reply := <-replyChan
 	if reply.ty == protocol.Tlast {
 		return reply.fn(b)
 	} else if t != reply.ty {

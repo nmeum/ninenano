@@ -21,6 +21,36 @@ var (
 	paddr = flag.String("pa", ":4223", "9P server network address")
 )
 
+// Handles incoming connections on the control socket.
+func handlecc(conn net.Conn) {
+	log.Println("New control server connection")
+
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
+		cmd := scanner.Text()
+
+		log.Printf("Received control command %q\n", cmd)
+		if reply, ok := ctlcmds[cmd]; !ok {
+			log.Println("Unknown control command")
+			replyChan <- failureReply
+		} else {
+			replyChan <- reply
+		}
+	}
+
+	err := scanner.Err()
+	if err != nil {
+		log.Printf("Scanner error: %_\n", err.Error())
+	}
+}
+
+// Handles incoming connection on the protocol socket. Connection are
+// basically just passed to the ninep server.
+func handlepc(conn net.Conn) {
+	log.Println("New protocol server connection")
+	NewServer(log.Printf, conn, conn).Start()
+}
+
 func main() {
 	cl, err := net.Listen("tcp", *caddr)
 	if err != nil {
@@ -38,31 +68,13 @@ func main() {
 			log.Printf("Accept: %v\n", err.Error())
 			continue
 		}
-		log.Println("New control server connection")
-
-		data, err := bufio.NewReader(cc).ReadString('\n')
-		if err != nil {
-			log.Printf("ReadAll: %v\n", err.Error())
-			continue
-		}
-
-		req := data[:len(data)-1]
-		log.Printf("Received control command %q\n", req)
-
-		if cmd, ok := ctlcmds[req]; !ok {
-			log.Println("Unknown control command")
-		} else {
-			reply = cmd
-		}
+		go handlecc(cc)
 
 		pc, err := pl.Accept()
 		if err != nil {
 			log.Printf("Accept: %v\n", err.Error())
 			continue
 		}
-		log.Println("New protocol server connection")
-
-		serv := NewServer(log.Printf, pc, pc)
-		serv.Start()
+		go handlepc(pc)
 	}
 }
