@@ -2,11 +2,7 @@
 
 #include "9pfs.h"
 
-/**
- * As with file descriptors, we need to store currently open fids
- * somehow. This is done in this static buffer.
- */
-static _9pfid fids[_9P_MAXFIDS];
+extern _9pfid fids[_9P_MAXFIDS];
 
 /**
  * This function can be used to add, get and delete fids.

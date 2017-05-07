@@ -30,6 +30,17 @@ static uint8_t buffer[_9P_MSIZE];
 static sock_tcp_t sock;
 
 /**
+ * As with file descriptors, we need to store currently open fids
+ * somehow. This is done in this static buffer. This buffer should only
+ * be accessed using the ::_fidtbl function it should never be modified
+ * directly.
+ *
+ * This buffer is not static because it is used in the ::_fidtbl
+ * function from `util.c`.
+ */
+_9pfid fids[_9P_MAXFIDS];
+
+/**
  * Initializes the 9P module. Among other things it opens a TCP socket
  * but it does not initiate the connection with the server. This has to
  * be done manually using the ::_9pversion and ::_9pattach functions.
@@ -42,7 +53,7 @@ _9pinit(sock_tcp_ep_t remote)
 {
 	int r;
 
-	DEBUG("Seeding the PRNG...\n");
+	memset(fids, '\0', _9P_MAXFIDS);
 	random_init(xtimer_now().ticks32);
 
 	DEBUG("Connecting to TCP socket...\n");
