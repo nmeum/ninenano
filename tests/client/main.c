@@ -19,6 +19,55 @@ static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
 /* Remote address for 9P protocol socket */
 static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
 
+static void
+test_9putil__fidtbl_add(void)
+{
+	_9pfid *f;
+
+	f = _fidtbl(23, ADD);
+
+	TEST_ASSERT_NOT_NULL(f);
+	TEST_ASSERT_EQUAL_INT(0, f->fid);
+}
+
+static void
+test_9putil_fidtbl_get(void)
+{
+	_9pfid *f1, *f2;
+
+	f1 = _fidtbl(42, ADD);
+	f1->fid = 42;
+	f1->path = "foobar";
+
+	f2 = _fidtbl(42, GET);
+
+	TEST_ASSERT_NOT_NULL(f2);
+	TEST_ASSERT_EQUAL_INT(42, f2->fid);
+	TEST_ASSERT_EQUAL_STRING("foobar", f2->path);
+}
+
+static void
+test_9putil_fidtbl_delete(void)
+{
+	_9pfid *f1, *f2;
+
+	f1 = _fidtbl(1337, ADD);
+	f1->fid = 1337;
+
+	f2 = _fidtbl(1337, DEL);
+
+	TEST_ASSERT_NOT_NULL(f2);
+	TEST_ASSERT_EQUAL_INT(0, f2->fid);
+	TEST_ASSERT_NULL(_fidtbl(1337, GET));
+}
+
+static void
+test_9putil_fidtbl_delete_rootfid(void)
+{
+	_fidtbl(_9P_ROOTFID, ADD);
+	TEST_ASSERT_NULL(_fidtbl(_9P_ROOTFID, DEL));
+}
+
 /**
  * You might be wondering why there are no comments below this points.
  * This is the case because the purpose of the various test cases is
@@ -111,14 +160,28 @@ test_9pfs__rattach_success(void)
 }
 
 static void
-test_9pfs__ratach_invalid_len(void)
+test_9pfs__rattach_invalid_len(void)
 {
 	setcmd("rattach_invalid_len\n");
 	TEST_ASSERT_NULL(_9pattach("foobar", NULL));
 }
 
-Test
-*tests_9pfs_tests(void)
+Test*
+tests_9putil_tests(void)
+{
+	EMB_UNIT_TESTFIXTURES(fixtures) {
+		new_TestFixture(test_9putil__fidtbl_add),
+		new_TestFixture(test_9putil_fidtbl_get),
+		new_TestFixture(test_9putil_fidtbl_delete),
+		new_TestFixture(test_9putil_fidtbl_delete_rootfid),
+	};
+
+	EMB_UNIT_TESTCALLER(_9putil_tests, NULL, NULL, fixtures);
+	return (Test*)&_9putil_tests;
+}
+
+Test*
+tests_9pfs_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9pfs__rversion_success),
@@ -127,8 +190,9 @@ Test
 		new_TestFixture(test_9pfs__rversion_invalid),
 		new_TestFixture(test_9pfs__rversion_invalid_len),
 		new_TestFixture(test_9pfs__rversion_version_too_long),
+
 		new_TestFixture(test_9pfs__rattach_success),
-		new_TestFixture(test_9pfs__ratach_invalid_len),
+		new_TestFixture(test_9pfs__rattach_invalid_len),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
@@ -148,6 +212,7 @@ main(void)
 	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, REMOTE_ADDR);
 
 	TESTS_START();
+	TESTS_RUN(tests_9putil_tests());
 	TESTS_RUN(tests_9pfs_tests());
 	TESTS_END();
 
