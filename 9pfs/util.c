@@ -5,7 +5,10 @@
 extern _9pfid fids[_9P_MAXFIDS];
 
 /**
- * This function can be used to add, get and delete fids.
+ * This function can be used to add, get and delete fids. It has one
+ * unexpected caveat: The add operation does set the `fid` field, it
+ * simply returns the next free fid. Thus the callers has to set the
+ * `fid` field on the struct pointer manually.
  *
  * @pre fid != 0
  * @param fid A 32-bit unsigned integer that the client uses to identify
