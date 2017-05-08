@@ -162,9 +162,6 @@ test_9pfs__rattach_success(void)
 {
 	_9pfid *fid;
 
-	setcmd("rversion_success\n");
-	_9pversion();
-
 	setcmd("rattach_success\n");
 	fid = _9pattach("foo", NULL);
 
