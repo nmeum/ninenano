@@ -31,7 +31,7 @@ test_9putil__fidtbl_add(void)
 }
 
 static void
-test_9putil_fidtbl_get(void)
+test_9putil__fidtbl_get(void)
 {
 	_9pfid *f1, *f2;
 
@@ -47,7 +47,7 @@ test_9putil_fidtbl_get(void)
 }
 
 static void
-test_9putil_fidtbl_delete(void)
+test_9putil__fidtbl_delete(void)
 {
 	_9pfid *f1, *f2;
 
@@ -62,7 +62,7 @@ test_9putil_fidtbl_delete(void)
 }
 
 static void
-test_9putil_fidtbl_delete_rootfid(void)
+test_9putil__fidtbl_delete_rootfid(void)
 {
 	_fidtbl(_9P_ROOTFID, ADD);
 	TEST_ASSERT_NULL(_fidtbl(_9P_ROOTFID, DEL));
@@ -171,9 +171,9 @@ tests_9putil_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9putil__fidtbl_add),
-		new_TestFixture(test_9putil_fidtbl_get),
-		new_TestFixture(test_9putil_fidtbl_delete),
-		new_TestFixture(test_9putil_fidtbl_delete_rootfid),
+		new_TestFixture(test_9putil__fidtbl_get),
+		new_TestFixture(test_9putil__fidtbl_delete),
+		new_TestFixture(test_9putil__fidtbl_delete_rootfid),
 	};
 
 	EMB_UNIT_TESTCALLER(_9putil_tests, NULL, NULL, fixtures);
