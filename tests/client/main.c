@@ -31,6 +31,12 @@ test_9putil__fidtbl_add(void)
 }
 
 static void
+test_9putil__fidtbl_add_invalid(void)
+{
+	TEST_ASSERT_NULL(_fidtbl(0, ADD));
+}
+
+static void
 test_9putil__fidtbl_get(void)
 {
 	_9pfid *f1, *f2;
@@ -73,6 +79,7 @@ tests_9putil_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9putil__fidtbl_add),
+		new_TestFixture(test_9putil__fidtbl_add_invalid),
 		new_TestFixture(test_9putil__fidtbl_get),
 		new_TestFixture(test_9putil__fidtbl_delete),
 		new_TestFixture(test_9putil__fidtbl_delete_rootfid),

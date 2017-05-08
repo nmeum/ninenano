@@ -25,7 +25,8 @@ _fidtbl(uint32_t fid, _9pfidop op)
 	size_t i, hash;
 
 	/* A value of 0 is used to indicate an unused table entry. */
-	assert(fid != 0);
+	if (!fid)
+		return NULL;
 	if (op == ADD)
 		fid = 0;
 
