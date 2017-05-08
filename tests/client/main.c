@@ -68,6 +68,20 @@ test_9putil__fidtbl_delete_rootfid(void)
 	TEST_ASSERT_NULL(_fidtbl(_9P_ROOTFID, DEL));
 }
 
+Test*
+tests_9putil_tests(void)
+{
+	EMB_UNIT_TESTFIXTURES(fixtures) {
+		new_TestFixture(test_9putil__fidtbl_add),
+		new_TestFixture(test_9putil__fidtbl_get),
+		new_TestFixture(test_9putil__fidtbl_delete),
+		new_TestFixture(test_9putil__fidtbl_delete_rootfid),
+	};
+
+	EMB_UNIT_TESTCALLER(_9putil_tests, NULL, NULL, fixtures);
+	return (Test*)&_9putil_tests;
+}
+
 /**
  * You might be wondering why there are no comments below this points.
  * This is the case because the purpose of the various test cases is
@@ -164,20 +178,6 @@ test_9pfs__rattach_invalid_len(void)
 {
 	setcmd("rattach_invalid_len\n");
 	TEST_ASSERT_NULL(_9pattach("foobar", NULL));
-}
-
-Test*
-tests_9putil_tests(void)
-{
-	EMB_UNIT_TESTFIXTURES(fixtures) {
-		new_TestFixture(test_9putil__fidtbl_add),
-		new_TestFixture(test_9putil__fidtbl_get),
-		new_TestFixture(test_9putil__fidtbl_delete),
-		new_TestFixture(test_9putil__fidtbl_delete_rootfid),
-	};
-
-	EMB_UNIT_TESTCALLER(_9putil_tests, NULL, NULL, fixtures);
-	return (Test*)&_9putil_tests;
 }
 
 Test*
