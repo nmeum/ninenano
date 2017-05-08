@@ -53,7 +53,6 @@ _9pinit(sock_tcp_ep_t remote)
 {
 	int r;
 
-	memset(fids, '\0', _9P_MAXFIDS);
 	random_init(xtimer_now().ticks32);
 
 	DEBUG("Connecting to TCP socket...\n");
@@ -70,6 +69,7 @@ _9pinit(sock_tcp_ep_t remote)
 void
 _9pclose(void)
 {
+	memset(fids, '\0', _9P_MAXFIDS);
 	sock_tcp_disconnect(&sock);
 }
 
