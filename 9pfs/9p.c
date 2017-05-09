@@ -104,7 +104,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 	 *   specifying the length in bytes of the complete message
 	 *   including the four bytes of the size field itself.
 	 */
-	if (buflen < 4)
+	if (buflen < BIT32SZ)
 		return -EBADMSG;
 	_ptoh32(&pkt->len, pkt);
 
@@ -153,7 +153,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 static int
 _do9p(_9ppkt *t, _9ppkt *r)
 {
-	int ret;
+	int ret; /* XXX should be a ssize_t */
 	uint8_t head[_9P_HEADSIZ], *headpos;
 
 	headpos = head;
