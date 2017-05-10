@@ -30,6 +30,23 @@ static uint8_t buffer[_9P_MSIZE];
 static sock_tcp_t sock;
 
 /**
+ * From version(5):
+ *   The client suggests a maximum message size, msize, that is the
+ *   maximum length, in bytes, it will ever generate or expect to
+ *   receive in a single 9P message.
+ *
+ * The msize we are suggestion to the server is defined by the macro
+ * ::_9P_MSIZE for the unlikly event that the server choosen an msize
+ * smaller than the one we are suggesting we are storing the msize
+ * actually used for the communication in this variable.
+ *
+ * It is declared with the initial value ::_9P_MSIZE to make it possible
+ * to use this variable as an argument to ::sock_tcp_read even before
+ * a session is established.
+ */
+static uint32_t msize = _9P_MSIZE;
+
+/**
  * As with file descriptors, we need to store currently open fids
  * somehow. This is done in this static buffer. This buffer should only
  * be accessed using the ::_fidtbl function it should never be modified
@@ -180,7 +197,7 @@ _do9p(_9ppkt *t, _9ppkt *r)
 
 	DEBUG("Reading from server...\n");
 	if ((ret = sock_tcp_read(&sock, buffer,
-			_9P_MSIZE, SOCK_NO_TIMEOUT)) < 0)
+			msize, SOCK_NO_TIMEOUT)) < 0)
 		return ret;
 
 	DEBUG("Read %d bytes from server, parsing them...\n", ret);
@@ -210,7 +227,8 @@ _do9p(_9ppkt *t, _9ppkt *r)
  *
  * The version parameter is always set to the value of `_9P_VERSION`,
  * the msize parameter on the other hand is always set to the value of
- * `_9P_MSIZE`.
+ * `_9P_MSIZE`. The msize choosen by the server is stored in the global
+ * ::msize variable.
  *
  * @return `0` on success.
  * @return `-EBADMSG` if the 9P message was invalid.
@@ -224,7 +242,6 @@ _9pversion(void)
 	int r;
 	char ver[_9P_VERLEN];
 	uint8_t *bufpos;
-	uint32_t msize;
 	_9ppkt tver, rver;
 
 	bufpos = tver.buf = buffer;
@@ -405,7 +422,8 @@ _9pstat(_9pfid *fid, struct stat *b)
 	b->st_dev = b->st_ino = b->st_rdev = 0;
 	b->st_nlink = 1;
 	b->st_uid = b->st_gid = 0;
-	b->st_blksize = b->st_blocks = 0; /* XXX */
+	b->st_blksize = msize - _9P_IOHDRSIZ;
+	b->st_blocks = b->st_size / b->st_blksize + 1;
 
 	/* extract the file name and store it in the fid. */
 	if (_hstring(fid->path, _9P_PTHMAX, &rstat))

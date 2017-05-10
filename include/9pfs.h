@@ -93,8 +93,16 @@ enum {
 	_9P_QIDSIZ = BIT8SZ + BIT32SZ + BIT64SZ,
 
 	/**
-	 * Size of the machine-independent directory entry, stat. See
-	 * stat(5) for more information.
+	 * Ample room for Twrite/Rread header (iounit). This has been
+	 * copied from the Plan 9 sourcetree, the file can be found at
+	 * the location `sys/include/fcall.h`.
+	 */
+	_9P_IOHDRSIZ = 24,
+
+	/**
+	 * Size of the machine-independent directory entry, stat. This
+	 * includes the leading 16-bit count. See stat(5) for more
+	 * information.
 	 */
 	_9P_STATSIZ = BIT16SZ + _9P_QIDSIZ + 5 * BIT16SZ + 4 * BIT32SZ + BIT64SZ,
 

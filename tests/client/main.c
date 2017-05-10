@@ -225,7 +225,8 @@ test_9pfs__rstat_success(void)
 	TEST_ASSERT_EQUAL_INT(1, st.st_nlink);
 	TEST_ASSERT_EQUAL_INT(0, st.st_uid);
 	TEST_ASSERT_EQUAL_INT(0, st.st_gid);
-	/* TODO blocks and blksize */
+	TEST_ASSERT_EQUAL_INT(_9P_MSIZE - _9P_IOHDRSIZ, st.st_blksize);
+	TEST_ASSERT_EQUAL_INT(2342 / (_9P_MSIZE - _9P_IOHDRSIZ) + 1, st.st_blocks);
 
 	TEST_ASSERT_EQUAL_STRING("testfile", (char*)f.path);
 }
