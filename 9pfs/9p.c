@@ -252,7 +252,7 @@ _9pversion(void)
 		return -EBADMSG;
 	_ptoh32(&msize, &rver);
 
-	DEBUG("msize of Rversion message: %d\n", msize);
+	DEBUG("Msize of Rversion message: %d\n", msize);
 
 	/* From version(5):
 	 *   The server responds with its own maximum, msize, which must
@@ -268,8 +268,8 @@ _9pversion(void)
 	 *  string, it should respond with an Rversion message (not
 	 *  Rerror) with the version string the 7 characters `unknown`.
          */
-        if (_hstring(ver, _9P_VERLEN, &rver))
-        	return -EBADMSG;
+	if (_hstring(ver, _9P_VERLEN, &rver))
+		return -EBADMSG;
 
 	DEBUG("Version string reported by server: %s\n", ver);
 	if (!strcmp(ver, "unknown"))
@@ -323,9 +323,95 @@ _9pattach(char *uname, char *aname)
 		return NULL;
 	fid->fid = _9P_ROOTFID;
 
-	fid->path = "";
+	strcpy(fid->path, "");
 	if (_hqid(&fid->qid, &ratt))
 		return NULL;
 
 	return fid;
+}
+
+/**
+ * From intro(5):
+ *   The stat transaction retrieves information about the file. The stat
+ *   field in the reply includes the file's name, access permissions
+ *   (read, write and execute for owner, group and public), access and
+ *   modification times, and owner and group identifications (see
+ *   stat(2)).
+ *
+ * Retrieves information about the file associated with the given fid.
+ *
+ * @param fid Fid of the file to retrieve information for.
+ * @param buf Pointer to stat struct to fill.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+int
+_9pstat(_9pfid *fid, struct stat *b)
+{
+	int r;
+	uint8_t *bufpos;
+	uint32_t mode;
+	_9ppkt tstat, rstat;
+
+	bufpos = tstat.buf = buffer;
+
+	/* From intro(5):
+	 *   size[4] Tstat tag[2] fid[4]
+	 */
+	tstat.type = Tstat;
+	bufpos = _htop32(bufpos, fid->fid);
+
+	tstat.len = bufpos - tstat.buf;
+	if ((r = _do9p(&tstat, &rstat)))
+		return -1;
+
+	/* From intro(5):
+	 *   size[4] Rstat tag[2] stat[n]
+	 *
+	 * See stat(5) for the definition of stat[n].
+	 */
+	if (rstat.len < _9P_STATSIZ)
+		return -EBADMSG;
+
+	/* From intro(5):
+	 *   The notation parameter[n] where n is not a constant
+	 *   represents a variable-length parameter: n[2] followed by n
+	 *   bytes of data forming the parameter.
+	 *
+	 * The value of the first two-byte field should however be equal
+	 * to rstat.len at this point. If it isn't the server fucked up,
+	 * checking it doesn't matter though because we know that we
+	 * received at least rstat.len bytes. Therefore we just ignore
+	 * this value here as well as the other value we don't need.
+	 *
+	 * Therefore we skip: n[2], size[2], type[2] and dev[4].
+	 */
+	rstat.buf += 3 * BIT16SZ + BIT32SZ;
+	rstat.len -= 3 * BIT16SZ + BIT32SZ;
+
+	/* store qid informations in given fid. */
+	_ptoh8(&fid->qid.type, &rstat);
+	_ptoh32(&fid->qid.vers, &rstat);
+	_ptoh64(&fid->qid.path, &rstat);
+
+	/* store the other information in the stat struct. */
+	_ptoh32(&mode, &rstat);
+	b->st_mode = (mode & DMDIR) ? S_IFDIR : S_IFREG;
+	_ptoh32((uint32_t*)&b->st_atime, &rstat);
+	_ptoh32((uint32_t*)&b->st_mtime, &rstat);
+	b->st_ctime = b->st_mtime;
+	_ptoh64((uint64_t*)&b->st_size, &rstat);
+
+	/* information for stat struct we cannot extract from the reply. */
+	b->st_dev = b->st_ino = b->st_rdev = 0;
+	b->st_nlink = 1;
+	b->st_uid = b->st_gid = 0;
+	b->st_blksize = b->st_blocks = 0; /* XXX */
+
+	/* extract the file name and store it in the fid. */
+	if (_hstring(fid->path, _9P_PTHMAX, &rstat))
+		return -EBADMSG;
+
+	/* uid, gid and muid are ignored. */
+
+	return 0;
 }

@@ -289,7 +289,7 @@ _hqid(_9pqid *dest, _9ppkt *pkt)
 		return -1;
 
 	_ptoh8(&dest->type, pkt);
-	_ptoh32(&dest->ver, pkt);
+	_ptoh32(&dest->vers, pkt);
 	_ptoh64(&dest->path, pkt);
 
 	return 0;

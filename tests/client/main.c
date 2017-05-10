@@ -57,13 +57,13 @@ test_9putil__fidtbl_get(void)
 
 	f1 = _fidtbl(42, ADD);
 	f1->fid = 42;
-	f1->path = "foobar";
+	strcpy(f1->path, "foobar");
 
 	f2 = _fidtbl(42, GET);
 
 	TEST_ASSERT_NOT_NULL(f2);
 	TEST_ASSERT_EQUAL_INT(42, f2->fid);
-	TEST_ASSERT_EQUAL_STRING("foobar", f2->path);
+	TEST_ASSERT_EQUAL_STRING("foobar", (char*)f2->path);
 }
 
 static void
@@ -189,7 +189,7 @@ test_9pfs__rattach_success(void)
 	fid = _9pattach("foo", NULL);
 
 	TEST_ASSERT_NOT_NULL(fid);
-	TEST_ASSERT_EQUAL_STRING("", fid->path);
+	TEST_ASSERT_EQUAL_STRING("", (char*)fid->path);
 	TEST_ASSERT(fid->fid > 0);
 }
 
@@ -198,6 +198,36 @@ test_9pfs__rattach_invalid_len(void)
 {
 	setcmd("rattach_invalid_len\n");
 	TEST_ASSERT_NULL(_9pattach("foobar", NULL));
+}
+
+static void
+test_9pfs__rstat_success(void)
+{
+	_9pfid f;
+	struct stat st;
+
+	setcmd("rstat_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9pstat(&f, &st));
+
+	TEST_ASSERT_EQUAL_INT(23, f.qid.type);
+	TEST_ASSERT_EQUAL_INT(2342, f.qid.vers);
+	TEST_ASSERT_EQUAL_INT(1337, f.qid.path);
+
+	TEST_ASSERT_EQUAL_INT(S_IFDIR, st.st_mode);
+	TEST_ASSERT_EQUAL_INT(1494443596, st.st_atime);
+	TEST_ASSERT_EQUAL_INT(1494443609, st.st_mtime);
+	TEST_ASSERT_EQUAL_INT(st.st_mtime, st.st_ctime);
+	TEST_ASSERT_EQUAL_INT(2342, st.st_size);
+
+	TEST_ASSERT_EQUAL_INT(0, st.st_dev);
+	TEST_ASSERT_EQUAL_INT(0, st.st_ino);
+	TEST_ASSERT_EQUAL_INT(0, st.st_rdev);
+	TEST_ASSERT_EQUAL_INT(1, st.st_nlink);
+	TEST_ASSERT_EQUAL_INT(0, st.st_uid);
+	TEST_ASSERT_EQUAL_INT(0, st.st_gid);
+	/* TODO blocks and blksize */
+
+	TEST_ASSERT_EQUAL_STRING("testfile", (char*)f.path);
 }
 
 Test*
@@ -213,6 +243,8 @@ tests_9pfs_tests(void)
 
 		new_TestFixture(test_9pfs__rattach_success),
 		new_TestFixture(test_9pfs__rattach_invalid_len),
+
+		new_TestFixture(test_9pfs__rstat_success),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);

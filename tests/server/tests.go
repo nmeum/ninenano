@@ -17,6 +17,8 @@ var ctlcmds = map[string]ServerReply{
 
 	"rattach_success":     {RattachSuccess, protocol.Tattach},
 	"rattach_invalid_len": {RattachInvalidLength, protocol.Tattach},
+
+	"rstat_success": {RstatSuccess, protocol.Tstat},
 }
 
 // Replies with the msize and version send by the client. This should always be
@@ -152,5 +154,40 @@ func RattachInvalidLength(b *bytes.Buffer) error {
 	var l uint64 = uint64(b.Len()) - 1
 	copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
 
+	return nil
+}
+
+// Replies with a valid Rstat message. The client must be able to parse
+// this R-message.
+func RstatSuccess(b *bytes.Buffer) error {
+	_, t, err := protocol.UnmarshalTstatPkt(b)
+	if err != nil {
+		return err
+	}
+
+	qid := protocol.QID{
+		Type:    23,
+		Version: 2342,
+		Path:    1337,
+	}
+
+	dir := protocol.Dir{
+		Type:    9001,
+		Dev:     5,
+		QID:     qid,
+		Mode:    protocol.DMDIR,
+		Atime:   1494443596,
+		Mtime:   1494443609,
+		Length:  2342,
+		Name:    "testfile",
+		User:    "testuser",
+		Group:   "testgroup",
+		ModUser: "ken",
+	}
+
+	var B bytes.Buffer
+	protocol.Marshaldir(&B, dir)
+
+	protocol.MarshalRstatPkt(b, t, B.Bytes())
 	return nil
 }

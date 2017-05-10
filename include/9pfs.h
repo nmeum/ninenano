@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <sys/stat.h>
 
 #include "net/sock/tcp.h"
 
@@ -83,13 +84,19 @@ enum {
 	 * same so I am going to take the liberty of refering to those 7 bytes
 	 * as `header` in the comments.
 	 */
-	_9P_HEADSIZ = 7,
+	_9P_HEADSIZ = BIT32SZ + 1 + BIT16SZ,
 
 	/**
 	 * Size of a qid consisting of one one-byte field, one four-byte
 	 * field and one eight-byte field.
 	 */
 	_9P_QIDSIZ = BIT8SZ + BIT32SZ + BIT64SZ,
+
+	/**
+	 * Size of the machine-independent directory entry, stat. See
+	 * stat(5) for more information.
+	 */
+	_9P_STATSIZ = BIT16SZ + _9P_QIDSIZ + 5 * BIT16SZ + 4 * BIT32SZ + BIT64SZ,
 
 	/**
 	 * Maximum length of a version string in a R-message. The
@@ -104,11 +111,29 @@ enum {
 	 * directory of the desired file tree.
 	 */
 	_9P_ROOTFID = 1,
+
+	/**
+	 * Maximum size of a file path as used in a fid.
+	 */
+	_9P_PTHMAX = 32,
 };
 
 /**
+ * From stat(5):
+ *   The mode contains permission bits as described in intro(5)
+ *   and the following: 0x80000000 (DMDIR, this file is a direc-
+ *   tory), 0x40000000 (DMAPPEND, append only), 0x20000000
+ *   (DMEXCL, exclusive use), 0x04000000 (DMTMP, temporary);
+ *   these are echoed in Qid.type.
+ */
+#define DMDIR 0x80000000 /**< Mode bit for directories. */
+#define DMAPPEND 0x40000000 /**< Mode bit for append only files. */
+#define DMEXCL 0x20000000 /**< Mode bit for exclusive use files. */
+#define DMTMP 0x04000000 /**< Mode bit for non-backed-up file. */
+
+/**
  * Valid values for the type field of a 9P message. This has been copied
- * from the Plan 9 source, the file can be found at the location
+ * from the Plan 9 sourcetree, the file can be found at the location
  * `sys/include/fcall.h`.
  */
 typedef enum {
@@ -174,7 +199,7 @@ typedef struct {
 	 *   The version is a version number for a file; typically, it
 	 *   is incremented every time the file is modified.
 	 */
-	uint32_t ver;
+	uint32_t vers;
 
 	/**
 	 * From intro(5):
@@ -196,9 +221,20 @@ typedef struct {
  *   being manipulated by the operating system - are identified by fids.
  */
 typedef struct {
-	char *path;   /**< Path of this fid on the server. */
-	uint32_t fid; /**< The 32-bit unsigned integer representation of this fid. */
-	_9pqid qid;   /**< The qid associated with this fid. */
+	/**
+	 * Path of this fid on the server.
+	 */
+	char path[_9P_PTHMAX];
+
+	/**
+	 * The 32-bit unsigned integer representation of this fid.
+	 */
+	uint32_t fid;
+
+	/**
+	 * The qid associated with this fid.
+	 */
+	_9pqid qid;
 } _9pfid;
 
 /**
@@ -239,6 +275,7 @@ void _9pclose(void);
 
 int _9pversion(void);
 _9pfid* _9pattach(char*, char*);
+int _9pstat(_9pfid*, struct stat*);
 
 _9pfid* _fidtbl(uint32_t, _9pfidop);
 
