@@ -26,6 +26,15 @@
 #endif
 
 /**
+ * Timeout used for reading from the connection socket. Defaults to not
+ * using a timeout at all potentially waiting for ever if no data is
+ * received.
+ */
+#ifndef _9P_TIMOUT
+  #define _9P_TIMOUT SOCK_NO_TIMEOUT
+#endif
+
+/**
  * From intro(5):
  *   Most T-messages contain a fid, a 32-bit unsigned integer that the
  *   client uses to identify a ``current file'' on the server. Fids are

@@ -196,8 +196,7 @@ _do9p(_9ppkt *t, _9ppkt *r)
 		return ret;
 
 	DEBUG("Reading from server...\n");
-	if ((ret = sock_tcp_read(&sock, buffer,
-			msize, SOCK_NO_TIMEOUT)) < 0)
+	if ((ret = sock_tcp_read(&sock, buffer, msize, _9P_TIMOUT)) < 0)
 		return ret;
 
 	DEBUG("Read %d bytes from server, parsing them...\n", ret);
