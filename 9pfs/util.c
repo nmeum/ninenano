@@ -1,6 +1,9 @@
+#include <assert.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "9pfs.h"
+#include "random.h"
 
 extern _9pfid fids[_9P_MAXFIDS];
 
@@ -252,7 +255,7 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
 {
 	uint16_t siz;
 
-	if (pkt->len <= BIT16SZ)
+	if (pkt->len < BIT16SZ)
 		return -1;
 	_ptoh16(&siz, pkt);
 

@@ -17,7 +17,11 @@ CFLAGS += -DDEVELHELP -ggdb
 CFLAGS += -DCPORT=2342 -DPPORT=4223
 
 # CFLAGS for configuring address of test server
-CFLAGS += -DREMOTE_ADDR=\"$(NINEP_TESTSERVER)\"
+ifeq ($(NINEP_TESTSERVER),)
+  $(error 'NINEP_TESTSERVER' environment variable isn't set)
+else
+  CFLAGS += -DREMOTE_ADDR=\"$(NINEP_TESTSERVER)\"
+endif
 
 # Modules required for using sock_tcp
 USEMODULE += ipv6_addr

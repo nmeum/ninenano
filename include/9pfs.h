@@ -133,6 +133,18 @@ enum {
 	 * Maximum size of a file path as used in a fid.
 	 */
 	_9P_PTHMAX = 32,
+
+	/**
+	 * From walk(5):
+	 *   To simplify the implementation of the servers, a maximum of
+	 *   sixteen name elements or qids may be packed in a single message.
+	 */
+	_9P_MAXWEL = 16,
+
+	/**
+	 * Path seperator used to split a path into nwnames.
+	 */
+	_9P_PATHSEP = '/',
 };
 
 /**
@@ -143,10 +155,10 @@ enum {
  *   (DMEXCL, exclusive use), 0x04000000 (DMTMP, temporary);
  *   these are echoed in Qid.type.
  */
-#define DMDIR 0x80000000 /**< Mode bit for directories. */
+#define DMDIR    0x80000000 /**< Mode bit for directories. */
 #define DMAPPEND 0x40000000 /**< Mode bit for append only files. */
-#define DMEXCL 0x20000000 /**< Mode bit for exclusive use files. */
-#define DMTMP 0x04000000 /**< Mode bit for non-backed-up file. */
+#define DMEXCL   0x20000000 /**< Mode bit for exclusive use files. */
+#define DMTMP    0x04000000 /**< Mode bit for non-backed-up file. */
 
 /**
  * Valid values for the type field of a 9P message. This has been copied
@@ -298,7 +310,6 @@ _9pfid* _fidtbl(uint32_t, _9pfidop);
 
 uint8_t* _pstring(uint8_t*, char*);
 int _hstring(char*, uint16_t, _9ppkt*);
-
 int _hqid(_9pqid*, _9ppkt*);
 
 uint8_t* _htop8(uint8_t*, uint8_t);

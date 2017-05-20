@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <byteorder.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "xtimer.h"
 #include "random.h"
@@ -41,8 +42,8 @@ static sock_tcp_t sock;
  * actually used for the communication in this variable.
  *
  * It is declared with the initial value ::_9P_MSIZE to make it possible
- * to use this variable as an argument to ::sock_tcp_read even before
- * a session is established.
+ * to use this variable as an argument to ::sock_tcp_read even before a
+ * session is established.
  */
 static uint32_t msize = _9P_MSIZE;
 
@@ -156,60 +157,69 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
  * server, reads the R-message from the client and stores it in a memory
  * location provided by the caller.
  *
- * Keep in mind that the R- and T-messages use the same buffer for the
- * message specific parameter, thus after calling this method you
- * shouldn't read from the R-message buffer anymore.
+ * Keep in mind that the same ::_9ppkt is being used for the T- and
+ * R-message, thus after calling this method you shouldn't can't access
+ * the R-message values anymore.
  *
- * @param t T-message which should be send to the 9P server. The caller
- *   doesn't need to initialize the `tag` field since this is
- *   initialized by this function.
- * @param r Pointer to a memory location where the server response
- *   (the R-message) should be stored.
+ * @param p Pointer to the memory location containing the T-message. The
+ *   caller doesn't need to initialize the `tag` field of this message.
+ *   Besides this pointer is also used to store the R-message send by
+ *   the server as a reply.
  * @return `0` on success, on error a negative errno is returned.
  */
 static int
-_do9p(_9ppkt *t, _9ppkt *r)
+_do9p(_9ppkt *p)
 {
-	int ret; /* XXX should be a ssize_t */
+	ssize_t ret; /* XXX should be a ssize_t */
+	_9ptype ttype;
+	uint16_t ttag;
 	uint8_t head[_9P_HEADSIZ], *headpos;
 
 	headpos = head;
-	DEBUG("Sending message of type %d to server\n", t->type);
+	DEBUG("Sending message of type %d to server\n", p->type);
 
 	/* From version(5):
 	 *   The tag should be NOTAG (value (ushort)~0) for a version message.
 	 */
-	t->tag = (t->type == Tversion) ?
+	p->tag = (p->type == Tversion) ?
 		_9P_NOTAG : random_uint32();
 
 	/* Build the "header", meaning: size[4] type[1] tag[2]
 	 * Every 9P message needs those first 7 bytes. */
-	headpos = _htop32(headpos, t->len + _9P_HEADSIZ);
-	headpos = _htop8(headpos, t->type);
-	headpos = _htop16(headpos, t->tag);
+	headpos = _htop32(headpos, p->len + _9P_HEADSIZ);
+	headpos = _htop8(headpos, p->type);
+	headpos = _htop16(headpos, p->tag);
 
-	DEBUG("Sending %d bytes to server...\n", _9P_HEADSIZ + t->len);
+	DEBUG("Sending %d bytes to server...\n", _9P_HEADSIZ + p->len);
 	if ((ret = sock_tcp_write(&sock, head, _9P_HEADSIZ)) < 0)
 		return ret;
-	if (t->len > 0 && (ret = sock_tcp_write(&sock,
-			t->buf, t->len)) < 0)
+	if (p->len > 0 && (ret = sock_tcp_write(&sock,
+			p->buf, p->len)) < 0)
 		return ret;
 
 	DEBUG("Reading from server...\n");
 	if ((ret = sock_tcp_read(&sock, buffer, msize, _9P_TIMOUT)) < 0)
 		return ret;
 
+	/* Tag and type will be overwritten by _9pheader. */
+	ttype = p->type;
+	ttag = p->tag;
+
+	/* Maximum length of a 9P message is 2^32. */
+	if ((unsigned)ret > UINT32_MAX) /* ret is >= 0 at this point. */
+		return -EBADMSG;
+
 	DEBUG("Read %d bytes from server, parsing them...\n", ret);
-	if ((ret = _9pheader(r, (uint32_t)ret)))
+	if ((ret = _9pheader(p, (uint32_t)ret)))
 		return ret;
 
-	if (r->tag != t->tag) {
-		DEBUG("Tag mismatch (%d vs. %d)\n", r->tag, t->tag);
+	if (p->tag != ttag) {
+		DEBUG("Tag mismatch (%d vs. %d)\n", p->tag, ttag);
 		return -EBADMSG;
 	}
 
-	if (r->type != t->type + 1) {
-		DEBUG("Unexpected value in type field: %d\n", r->type);
+	if (p->type != ttype + 1) {
+		DEBUG("Unexpected value in type field: %d\n", p->type);
 		return -EBADMSG;
 	}
 
@@ -241,19 +251,19 @@ _9pversion(void)
 	int r;
 	char ver[_9P_VERLEN];
 	uint8_t *bufpos;
-	_9ppkt tver, rver;
+	_9ppkt pkt;
 
-	bufpos = tver.buf = buffer;
+	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tversion tag[2] msize[4] version[s]
 	 */
-	tver.type = Tversion;
+	pkt.type = Tversion;
 	bufpos = _htop32(bufpos, _9P_MSIZE);
 	bufpos = _pstring(bufpos, _9P_VERSION);
 
-	tver.len = bufpos - tver.buf;
-	if ((r = _do9p(&tver, &rver)))
+	pkt.len = bufpos - pkt.buf;
+	if ((r = _do9p(&pkt)))
 		return r;
 
 	/* From intro(5):
@@ -264,9 +274,9 @@ _9pversion(void)
 	 * to be at least 4 bytes long plus 2 bytes for the size tag and
 	 * 4 bytes for the msize field.
 	 */
-	if (rver.len <= 10)
+	if (pkt.len <= 10)
 		return -EBADMSG;
-	_ptoh32(&msize, &rver);
+	_ptoh32(&msize, &pkt);
 
 	DEBUG("Msize of Rversion message: %d\n", msize);
 
@@ -284,7 +294,7 @@ _9pversion(void)
 	 *  string, it should respond with an Rversion message (not
 	 *  Rerror) with the version string the 7 characters `unknown`.
          */
-	if (_hstring(ver, _9P_VERLEN, &rver))
+	if (_hstring(ver, _9P_VERLEN, &pkt))
 		return -EBADMSG;
 
 	DEBUG("Version string reported by server: %s\n", ver);
@@ -315,21 +325,21 @@ _9pattach(char *uname, char *aname)
 	int r;
 	uint8_t *bufpos;
 	_9pfid *fid;
-	_9ppkt tatt, ratt;
+	_9ppkt pkt;
 
-	bufpos = tatt.buf = buffer;
+	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tattach tag[2] fid[4] afid[4] uname[s] aname[s]
 	 */
-	tatt.type = Tattach;
+	pkt.type = Tattach;
 	bufpos = _htop32(bufpos, _9P_ROOTFID);
 	bufpos = _htop32(bufpos, _9P_NOFID);
 	bufpos = _pstring(bufpos, uname);
 	bufpos = _pstring(bufpos, aname);
 
-	tatt.len = bufpos - tatt.buf;
-	if ((r = _do9p(&tatt, &ratt)))
+	pkt.len = bufpos - pkt.buf;
+	if ((r = _do9p(&pkt)))
 		return NULL;
 
 	/* From intro(5):
@@ -339,8 +349,8 @@ _9pattach(char *uname, char *aname)
 		return NULL;
 	fid->fid = _9P_ROOTFID;
 
-	strcpy(fid->path, "");
-	if (_hqid(&fid->qid, &ratt))
+	*fid->path = '\0'; /* empty string */
+	if (_hqid(&fid->qid, &pkt))
 		return NULL;
 
 	return fid;
@@ -366,18 +376,19 @@ _9pstat(_9pfid *fid, struct stat *b)
 	int r;
 	uint8_t *bufpos;
 	uint32_t mode;
-	_9ppkt tstat, rstat;
+	uint16_t nstat;
+	_9ppkt pkt;
 
-	bufpos = tstat.buf = buffer;
+	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tstat tag[2] fid[4]
 	 */
-	tstat.type = Tstat;
+	pkt.type = Tstat;
 	bufpos = _htop32(bufpos, fid->fid);
 
-	tstat.len = bufpos - tstat.buf;
-	if ((r = _do9p(&tstat, &rstat)))
+	pkt.len = bufpos - pkt.buf;
+	if ((r = _do9p(&pkt)))
 		return -1;
 
 	/* From intro(5):
@@ -385,7 +396,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 	 *
 	 * See stat(5) for the definition of stat[n].
 	 */
-	if (rstat.len < _9P_STATSIZ)
+	if (pkt.len < _9P_STATSIZ)
 		return -EBADMSG;
 
 	/* From intro(5):
@@ -393,29 +404,30 @@ _9pstat(_9pfid *fid, struct stat *b)
 	 *   represents a variable-length parameter: n[2] followed by n
 	 *   bytes of data forming the parameter.
 	 *
-	 * The value of the first two-byte field should however be equal
-	 * to rstat.len at this point. If it isn't the server fucked up,
-	 * checking it doesn't matter though because we know that we
-	 * received at least rstat.len bytes. Therefore we just ignore
-	 * this value here as well as the other value we don't need.
-	 *
-	 * Therefore we skip: n[2], size[2], type[2] and dev[4].
+	 * The nstat value should be equal to pkt.len at this point.
 	 */
-	rstat.buf += 3 * BIT16SZ + BIT32SZ;
-	rstat.len -= 3 * BIT16SZ + BIT32SZ;
+	_ptoh16(&nstat, &pkt);
+
+	DEBUG("nstat: %d\n", nstat);
+	if (nstat != pkt.len)
+		return -EBADMSG;
+
+	/* Skip: n[2], size[2], type[2] and dev[4]. */
+	pkt.buf += 2 * BIT16SZ + BIT32SZ;
+	pkt.len -= 2 * BIT16SZ + BIT32SZ;
 
 	/* store qid informations in given fid. */
-	_ptoh8(&fid->qid.type, &rstat);
-	_ptoh32(&fid->qid.vers, &rstat);
-	_ptoh64(&fid->qid.path, &rstat);
+	_ptoh8(&fid->qid.type, &pkt);
+	_ptoh32(&fid->qid.vers, &pkt);
+	_ptoh64(&fid->qid.path, &pkt);
 
 	/* store the other information in the stat struct. */
-	_ptoh32(&mode, &rstat);
+	_ptoh32(&mode, &pkt);
 	b->st_mode = (mode & DMDIR) ? S_IFDIR : S_IFREG;
-	_ptoh32((uint32_t*)&b->st_atime, &rstat);
-	_ptoh32((uint32_t*)&b->st_mtime, &rstat);
+	_ptoh32((uint32_t*)&b->st_atime, &pkt);
+	_ptoh32((uint32_t*)&b->st_mtime, &pkt);
 	b->st_ctime = b->st_mtime;
-	_ptoh64((uint64_t*)&b->st_size, &rstat);
+	_ptoh64((uint64_t*)&b->st_size, &pkt);
 
 	/* information for stat struct we cannot extract from the reply. */
 	b->st_dev = b->st_ino = b->st_rdev = 0;
@@ -425,7 +437,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 	b->st_blocks = b->st_size / b->st_blksize + 1;
 
 	/* extract the file name and store it in the fid. */
-	if (_hstring(fid->path, _9P_PTHMAX, &rstat))
+	if (_hstring(fid->path, _9P_PTHMAX, &pkt))
 		return -EBADMSG;
 
 	/* uid, gid and muid are ignored. */

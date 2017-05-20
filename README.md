@@ -23,7 +23,8 @@ Roadmap
 
 * [ ] Refactor Documentation
 * [ ] s/char/unsiged char/
-* [ ] Write tests for _9pheader
+* [ ] Only do certian checks when compiled with -DDDEVHELP
+* [ ] Better errno return values to differentiate paths in unit tests
 * [ ] Implement missing message types
 
 License
