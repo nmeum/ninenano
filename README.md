@@ -28,6 +28,7 @@ Roadmap
 * [ ] s/char/unsiged char/
 * [ ] Only do certian checks when compiled with -DDDEVHELP + assert(3)
 * [ ] Better errno return values to differentiate paths in unit tests
+* [ ] Consider comparison with end pointer to detect buffer overflow in packets
 * [ ] Refactor Documentation
 * [ ] Implement missing message types
 

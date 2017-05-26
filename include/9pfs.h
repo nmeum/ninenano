@@ -299,6 +299,17 @@ typedef struct {
 	uint16_t tag;
 } _9ppkt;
 
+/**
+ * Macro to advandce the position in the packet buffer. The macro takes
+ * care of decrementing the length field of the packet as well.
+ *
+ * @param PKT Pointer to a packet in which the buffer position should be
+ *   advanced.
+ * @param OFF Offset which should be added to the buffer position.
+ */
+#define ADVBUF(PKT, OFF) \
+	do { (PKT)->buf += OFF; (PKT)->len -= OFF; } while (0)
+
 int _9pinit(sock_tcp_ep_t);
 void _9pclose(void);
 

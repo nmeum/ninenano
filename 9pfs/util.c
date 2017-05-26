@@ -173,9 +173,7 @@ void
 _ptoh8(uint8_t *dest, _9ppkt *pkt)
 {
 	*dest = *pkt->buf;
-
-	pkt->buf += BIT8SZ;
-	pkt->len -= BIT8SZ;
+	ADVBUF(pkt, BIT8SZ);
 }
 
 void
@@ -183,9 +181,7 @@ _ptoh16(uint16_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT16SZ);
 	*dest = _9p_swap(*dest, s);
-
-	pkt->buf += BIT16SZ;
-	pkt->len -= BIT16SZ;
+	ADVBUF(pkt, BIT16SZ);
 }
 
 void
@@ -193,9 +189,7 @@ _ptoh32(uint32_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT32SZ);
 	*dest = _9p_swap(*dest, l);
-
-	pkt->buf += BIT32SZ;
-	pkt->len -= BIT32SZ;
+	ADVBUF(pkt, BIT32SZ);
 }
 
 void
@@ -203,9 +197,7 @@ _ptoh64(uint64_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT64SZ);
 	*dest = _9p_swap(*dest, ll);
-
-	pkt->buf += BIT64SZ;
-	pkt->len -= BIT64SZ;
+	ADVBUF(pkt, BIT64SZ);
 }
 
 /**@}*/

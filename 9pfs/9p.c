@@ -413,8 +413,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 		return -EBADMSG;
 
 	/* Skip: n[2], size[2], type[2] and dev[4]. */
-	pkt.buf += 2 * BIT16SZ + BIT32SZ;
-	pkt.len -= 2 * BIT16SZ + BIT32SZ;
+	ADVBUF(&pkt, 2 * BIT16SZ + BIT32SZ);
 
 	/* store qid informations in given fid. */
 	if (_hqid(&fid->qid, &pkt))
@@ -539,9 +538,7 @@ _9pwalk(char *path)
 		return -EBADMSG;
 
 	/* Retrieve the last qid. */
-	pkt.buf += (nwqid * _9P_QIDSIZ) - _9P_QIDSIZ; /* XXX */
-	pkt.len -= (nwqid * _9P_QIDSIZ) - _9P_QIDSIZ; /* XXX */
-
+	ADVBUF(&pkt, (nwqid - 1) * _9P_QIDSIZ);
 	if (_hqid(&fid->qid, &pkt))
 		return NULL;
 
