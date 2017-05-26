@@ -28,10 +28,11 @@ _fidtbl(uint32_t fid, _9pfidop op)
 	/* A value of 0 is used to indicate an unused table entry. */
 	if (!fid)
 		return NULL;
+
+	hash = i = fid % _9P_MAXFIDS;
 	if (op == ADD)
 		fid = 0;
 
-	hash = i = fid % _9P_MAXFIDS;
 	do {
 		if ((ret = &fids[i])->fid == fid)
 			break;
