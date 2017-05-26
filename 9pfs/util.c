@@ -1,5 +1,3 @@
-#include <assert.h>
-#include <string.h>
 #include <sys/types.h>
 
 #include "9pfs.h"
@@ -50,6 +48,35 @@ _fidtbl(uint32_t fid, _9pfidop op)
 	}
 
 	return ret;
+}
+
+/**
+ * Finds a new **unique** fid for the fid table. Insert it into the fid
+ * table and returns a pointer to the new fid table entry.
+ *
+ * @return Pointer to fid table entry or NULL if the fid table is full.
+ */
+_9pfid*
+newfid(void)
+{
+	_9pfid *r;
+	size_t i;
+	uint32_t fid;
+
+	for (i = 1; i < _9P_MAXFIDS; i++) {
+		fid = random_uint32_range(1, UINT32_MAX);
+		if (_fidtbl(fid, GET))
+			continue;
+
+		/* TODO room for optimization don't call _fidtbl twice. */
+		r = _fidtbl(fid, ADD);
+		assert(r != NULL);
+
+		r->fid = fid;
+		return r;
+	}
+
+	return NULL;
 }
 
 /**
@@ -146,6 +173,7 @@ void
 _ptoh8(uint8_t *dest, _9ppkt *pkt)
 {
 	*dest = *pkt->buf;
+
 	pkt->buf += BIT8SZ;
 	pkt->len -= BIT8SZ;
 }
@@ -184,7 +212,7 @@ _ptoh64(uint64_t *dest, _9ppkt *pkt)
 
 /**
  * \defgroup Functions for converting strings from host representation
- * to protocol representation and vice versa.
+ *   to protocol representation and vice versa.
  * @{
  */
 
@@ -270,6 +298,13 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
 
 	return 0;
 }
+
+/**@}*/
+
+/**
+ * \defgroup Functions for converting qids.
+ * @{
+ */
 
 /**
  * From intro(5):

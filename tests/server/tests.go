@@ -28,6 +28,10 @@ var ctlcmds = map[string]ServerReply{
 
 	"rstat_success":       {RstatSuccess, protocol.Tstat},
 	"rstat_nstat_invalid": {RstatNstatInvalid, protocol.Tstat},
+
+	"rwalk_success":         {RwalkSuccess, protocol.Twalk},
+	"rwalk_invalid_len":     {RwalkInvalidLen, protocol.Twalk},
+	"rwalk_nwqid_too_large": {RwalkNwqidTooLarge, protocol.Twalk},
 }
 
 // Replies with a single byte. This is thus even shorter than the four-byte
@@ -339,5 +343,78 @@ func RstatNstatInvalid(b *bytes.Buffer) error {
 		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
 	}
 
+	return nil
+}
+
+// Replies with a valid Rwalk message. The last QID is different then
+// the other ones to test off-by-one errors. The client must be able
+// to parse this R-message.
+func RwalkSuccess(b *bytes.Buffer) error {
+	_, _, p, t, err := protocol.UnmarshalTwalkPkt(b)
+	if err != nil {
+		return err
+	}
+	plen := len(p)
+
+	q := protocol.QID{
+		Path:    23,
+		Type:    42,
+		Version: 5,
+	}
+
+	var qids []protocol.QID
+
+	for i := 0; i < plen; i++ {
+		qids = append(qids, q)
+	}
+
+	qids[plen-1] = protocol.QID{
+		Path:    1337,
+		Type:    23,
+		Version: 42,
+	}
+
+	protocol.MarshalRwalkPkt(b, t, qids)
+	return nil
+}
+
+// Replies with a message that is too short to be a valid Rwalk message.
+// The client should therefore reject this message.
+func RwalkInvalidLen(b *bytes.Buffer) error {
+	_, _, p, t, err := protocol.UnmarshalTwalkPkt(b)
+	if err != nil {
+		return err
+	}
+
+	var qids []protocol.QID
+	for i := 0; i < len(p); i++ {
+		qids = append(qids, protocol.QID{})
+	}
+
+	protocol.MarshalRwalkPkt(b, t, qids)
+
+	{
+		var l uint64 = uint64(10)
+		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	}
+
+	return nil
+}
+
+// Replies with a Rwalk message which contains an `nwqid` field that
+// exceeds MAXWELEM and should therefore be considered invalid by the
+// client.
+func RwalkNwqidTooLarge(b *bytes.Buffer) error {
+	_, _, _, t, err := protocol.UnmarshalTwalkPkt(b)
+	if err != nil {
+		return err
+	}
+
+	var qids []protocol.QID
+	for i := 0; i < 17; i++ {
+		qids = append(qids, protocol.QID{})
+	}
+
+	protocol.MarshalRwalkPkt(b, t, qids)
 	return nil
 }

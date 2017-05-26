@@ -14,10 +14,10 @@
  * Global static buffer used for storing message specific parameters.
  * Message indepented parameters are stored on the stack using `_9ppkt`.
  *
- * The functions writting to this buffer `_htop{8,16, 32, 64}` and so
- * assume that there is always enough space available and (for
- * performance reasons) do no perform any boundary checks when writting
- * to it.
+ * @attention The functions writting to this buffer `_htop{8,16, 32,
+ * 64}` and so assume that there is always enough space available and
+ * (for performance reasons) do no perform any boundary checks when
+ * writting to it.
  */
 static uint8_t buffer[_9P_MSIZE];
 
@@ -170,7 +170,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 static int
 _do9p(_9ppkt *p)
 {
-	ssize_t ret; /* XXX should be a ssize_t */
+	ssize_t ret;
 	_9ptype ttype;
 	uint16_t ttag;
 	uint8_t head[_9P_HEADSIZ], *headpos;
@@ -417,9 +417,8 @@ _9pstat(_9pfid *fid, struct stat *b)
 	pkt.len -= 2 * BIT16SZ + BIT32SZ;
 
 	/* store qid informations in given fid. */
-	_ptoh8(&fid->qid.type, &pkt);
-	_ptoh32(&fid->qid.vers, &pkt);
-	_ptoh64(&fid->qid.path, &pkt);
+	if (_hqid(&fid->qid, &pkt))
+		return -EBADMSG;
 
 	/* store the other information in the stat struct. */
 	_ptoh32(&mode, &pkt);
@@ -443,4 +442,108 @@ _9pstat(_9pfid *fid, struct stat *b)
 	/* uid, gid and muid are ignored. */
 
 	return 0;
+}
+
+/* TODO insert _9pwstat implementation here. */
+
+/**
+ * From intro(5):
+ *   A walk message causes the server to change the current file
+ *   associated with a fid to be a file in the directory that is the old
+ *   current file, or one of its subdirectories. Walk returns a new fid
+ *   that refers to the resulting file. Usually, a client maintains a
+ *   fid for the root, and navigates by walks from the root fid.
+ *
+ * This function alsways walks frmom the root fid and returns a fid for
+ * the last element of the given path.
+ *
+ * @attention The 9P protocol specifies that only a a maximum of sixteen
+ * name elements or qids may be packed in a single message.  For name
+ * elements or qids that exceeds this limit multiple Twalk/Rwalk message
+ * need to be send. Since `VFS_NAME_MAX` defaults to `31` it is very
+ * unlikely that this limit will be reached. Therefore this function
+ * doesn't support sending walk messages that exceed this limit.
+ *
+ * @param path Path which should be walked.
+ * @return Pointer to a fid associated with the directory reached at
+ *   the end of the walk or `NULL` on error.
+ */
+_9pfid*
+_9pwalk(char *path)
+{
+	int r;
+	char *cur, *sep;
+	size_t n, i, len;
+	uint8_t *bufpos, *nwname;
+	uint16_t nwqid;
+	ptrdiff_t elen;
+	_9pfid *fid;
+	_9ppkt pkt;
+
+	if (*path == '\0' || !strcmp(path, "/"))
+		return NULL; /* XXX */
+	bufpos = pkt.buf = buffer;
+
+	len = strlen(path);
+	if (len > UINT16_MAX)
+		return NULL;
+	if (!(fid = newfid()))
+		return NULL;
+
+	/* From intro(5):
+	 *   size[4] Twalk tag[2] fid[4] newfid[4] nwname[2]
+	 *   nwname*(wname[s])
+	 */
+	pkt.type = Twalk;
+	bufpos = _htop32(bufpos, _9P_ROOTFID);
+	bufpos = nwname = _htop32(bufpos, fid->fid);
+	bufpos += 2; /* leave space for nwname[2]. */
+
+	/* generate nwname*(wname[s]) */
+	for (n = i = 0; i < len; n++, i += elen + 1) {
+		if (n >= _9P_MAXWEL)
+			return NULL;
+
+		cur = &path[i];
+		if (!(sep = strchr(cur, '/')))
+			sep = &path[len - 1] + 1; /* XXX */
+		elen = sep - cur;
+
+		/* XXX this is a duplication of the _pstring func. */
+		bufpos = _htop16(bufpos, elen);
+		memcpy(bufpos, cur, elen);
+		bufpos += elen;
+	}
+
+	DEBUG("Constructed Twalk with %d elements\n", n);
+	_htop16(nwname, n); /* nwname[2] */
+
+	pkt.len = bufpos - pkt.buf;
+	if ((r = _do9p(&pkt)))
+		return NULL;
+
+	/* From intro(5):
+	 *   size[4] Rwalk tag[2] nwqid[2] nwqid*(wqid[13])
+	 */
+	if (pkt.len < _9P_HEADSIZ + BIT16SZ)
+		return NULL;
+	_ptoh16(&nwqid, &pkt);
+
+	/**
+	 * From walk(5):
+	 *   nwqid is therefore either nwname or the index of the first
+	 *   elementwise walk that failed.
+	 */
+	DEBUG("nwqid: %d\n", nwqid);
+	if (nwqid != n || nwqid > pkt.len || nwqid > _9P_MAXWEL) /* XXX */
+		return -EBADMSG;
+
+	/* Retrieve the last qid. */
+	pkt.buf += (nwqid * _9P_QIDSIZ) - _9P_QIDSIZ; /* XXX */
+	pkt.len -= (nwqid * _9P_QIDSIZ) - _9P_QIDSIZ; /* XXX */
+
+	if (_hqid(&fid->qid, &pkt))
+		return NULL;
+
+	return fid;
 }

@@ -376,6 +376,49 @@ test_9pfs__nstat_invalid(void)
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pstat(&f, &st));
 }
 
+static void
+test_9pfs__rwalk_success(void)
+{
+	_9pfid *f;
+
+	setcmd("rwalk_success\n");
+	f = _9pwalk("foo/bar");
+
+	TEST_ASSERT_NOT_NULL(f);
+	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
+	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
+	TEST_ASSERT_EQUAL_INT(1337, f->qid.path);
+}
+
+static void
+test_9pfs__rwalk_invalid_len(void)
+{
+	_9pfid *f;
+
+	setcmd("rwalk_invalid_len\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&f, "foobar"));
+}
+
+static void
+test_9pfs__rwalk_path_too_long(void)
+{
+	_9pfid *f;
+	char *path;
+
+	path = "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17";
+	TEST_ASSERT_EQUAL_INT(-EINVAL, _9pwalk(&f, path));
+
+}
+
+static void
+test_9pfs__rwalk_nwqid_too_large(void)
+{
+	_9pfid *f;
+
+	setcmd("rwalk_nwqid_too_large\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&f, "foo"));
+}
+
 Test*
 tests_9pfs_tests(void)
 {
@@ -400,6 +443,11 @@ tests_9pfs_tests(void)
 
 		new_TestFixture(test_9pfs__rstat_success),
 		new_TestFixture(test_9pfs__nstat_invalid),
+
+		new_TestFixture(test_9pfs__rwalk_success),
+		new_TestFixture(test_9pfs__rwalk_invalid_len),
+		new_TestFixture(test_9pfs__rwalk_path_too_long),
+		new_TestFixture(test_9pfs__rwalk_nwqid_too_large),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);

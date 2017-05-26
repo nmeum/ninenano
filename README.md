@@ -21,10 +21,14 @@ TODO
 Roadmap
 =======
 
-* [ ] Refactor Documentation
+* [ ] Simplify `_fibtbl` function
+* [ ] Better error codes for _9pattach and _9pwalk
+* [ ] Buffer overflow checks for insertion commands
+* [ ] More DEBUG calls
 * [ ] s/char/unsiged char/
-* [ ] Only do certian checks when compiled with -DDDEVHELP
+* [ ] Only do certian checks when compiled with -DDDEVHELP + assert(3)
 * [ ] Better errno return values to differentiate paths in unit tests
+* [ ] Refactor Documentation
 * [ ] Implement missing message types
 
 License

@@ -305,8 +305,10 @@ void _9pclose(void);
 int _9pversion(void);
 _9pfid* _9pattach(char*, char*);
 int _9pstat(_9pfid*, struct stat*);
+_9pfid* _9pwalk(char*);
 
 _9pfid* _fidtbl(uint32_t, _9pfidop);
+_9pfid* newfid(void);
 
 uint8_t* _pstring(uint8_t*, char*);
 int _hstring(char*, uint16_t, _9ppkt*);
