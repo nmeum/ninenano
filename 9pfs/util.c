@@ -98,7 +98,7 @@ newfid(void)
 #endif
 
 /**
- * \defgroup Functions for converting from host byte order to the byte
+ * @defgroup Functions for converting from host byte order to the byte \
  *   order used by the 9P protocol.
  *
  * Functions for converting integers encoded using the byte order used
@@ -154,8 +154,8 @@ _htop64(uint8_t *buf, uint64_t val)
 /**@}*/
 
 /**
- * \defgroup Functions for converting from the byte order used by the 9P
- *   protocol to the byte order used by the host.
+ * @defgroup Functions for converting from the byte order used by the \
+ *   9P protocol to the byte order used by the host.
  *
  * Functions for converting integers encoded using the byte order used
  * by the 9P protocol to the one used by the CPU (the host system).
@@ -211,7 +211,7 @@ _ptoh64(uint64_t *dest, _9ppkt *pkt)
 /**@}*/
 
 /**
- * \defgroup Functions for converting strings from host representation
+ * @defgroup Functions for converting strings from host representation \
  *   to protocol representation and vice versa.
  * @{
  */
@@ -302,7 +302,7 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
 /**@}*/
 
 /**
- * \defgroup Functions for converting qids.
+ * @defgroup Functions for converting qids.
  * @{
  */
 
