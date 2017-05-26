@@ -321,9 +321,8 @@ test_9pfs__rattach_success(void)
 	_9pfid *fid;
 
 	setcmd("rattach_success\n");
-	fid = _9pattach("foo", NULL);
+	TEST_ASSERT_EQUAL_INT(0, _9pattach(&fid, "foo", NULL));
 
-	TEST_ASSERT_NOT_NULL(fid);
 	TEST_ASSERT_EQUAL_STRING("", (char*)fid->path);
 	TEST_ASSERT(fid->fid > 0);
 }
@@ -331,8 +330,10 @@ test_9pfs__rattach_success(void)
 static void
 test_9pfs__rattach_invalid_len(void)
 {
+	_9pfid *fid;
+
 	setcmd("rattach_invalid_len\n");
-	TEST_ASSERT_NULL(_9pattach("foobar", NULL));
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pattach(&fid, "foobar", NULL));
 }
 
 static void

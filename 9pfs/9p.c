@@ -314,13 +314,14 @@ _9pversion(void)
  * The afid parameter is always set to the value of `_9P_NOFID` since
  * authentication is not supported currently.
  *
+ * @param dest Pointer to a pointer which should be set to the address
+ *   of the corresponding entry in the fid table.
  * @param uname User identification.
  * @param aname File tree to access.
- * @return Pointer to the location of the fib table entry associated
- *   with the qid returned by the server or NULL on failure.
+ * @return `0` on success, on error a negative errno is returned.
  */
-_9pfid*
-_9pattach(char *uname, char *aname)
+int
+_9pattach(_9pfid **dest, char *uname, char *aname)
 {
 	int r;
 	uint8_t *bufpos;
@@ -340,20 +341,21 @@ _9pattach(char *uname, char *aname)
 
 	pkt.len = bufpos - pkt.buf;
 	if ((r = _do9p(&pkt)))
-		return NULL;
+		return r;
 
 	/* From intro(5):
 	 *   size[4] Rattach tag[2] qid[13]
 	 */
 	if (!(fid = _fidtbl(_9P_ROOTFID, ADD)))
-		return NULL;
+		return -ENFILE;
 	fid->fid = _9P_ROOTFID;
 
 	*fid->path = '\0'; /* empty string */
 	if (_hqid(&fid->qid, &pkt))
-		return NULL;
+		return -EBADMSG;
 
-	return fid;
+	*dest = fid;
+	return 0;
 }
 
 /**
