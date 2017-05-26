@@ -22,7 +22,8 @@ Roadmap
 =======
 
 * [ ] Simplify `_fibtbl` function
-* [ ] Better error codes for _9pattach and _9pwalk
+* [x] Better error codes for _9pattach and _9pwalk
+* [ ] Check string length never exceeds UINT16_MAX
 * [ ] Buffer overflow checks for insertion commands
 * [ ] More DEBUG calls
 * [ ] s/char/unsiged char/

@@ -316,7 +316,7 @@ void _9pclose(void);
 int _9pversion(void);
 int _9pattach(_9pfid**, char*, char*);
 int _9pstat(_9pfid*, struct stat*);
-_9pfid* _9pwalk(char*);
+int _9pwalk(_9pfid**, char*);
 
 _9pfid* _fidtbl(uint32_t, _9pfidop);
 _9pfid* newfid(void);

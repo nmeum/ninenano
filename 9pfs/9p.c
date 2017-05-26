@@ -465,12 +465,13 @@ _9pstat(_9pfid *fid, struct stat *b)
  * unlikely that this limit will be reached. Therefore this function
  * doesn't support sending walk messages that exceed this limit.
  *
+ * @param dest Pointer to a pointer which should be set to the address
+ *   of the corresponding entry in the fid table.
  * @param path Path which should be walked.
- * @return Pointer to a fid associated with the directory reached at
- *   the end of the walk or `NULL` on error.
+ * @return `0` on success, on error a negative errno is returned.
  */
-_9pfid*
-_9pwalk(char *path)
+int
+_9pwalk(_9pfid **dest, char *path)
 {
 	int r;
 	char *cur, *sep;
@@ -482,14 +483,14 @@ _9pwalk(char *path)
 	_9ppkt pkt;
 
 	if (*path == '\0' || !strcmp(path, "/"))
-		return NULL; /* XXX */
+		return -EINVAL; /* TODO */
 	bufpos = pkt.buf = buffer;
 
 	len = strlen(path);
 	if (len > UINT16_MAX)
-		return NULL;
+		return -EINVAL;
 	if (!(fid = newfid()))
-		return NULL;
+		return -ENFILE;
 
 	/* From intro(5):
 	 *   size[4] Twalk tag[2] fid[4] newfid[4] nwname[2]
@@ -503,7 +504,7 @@ _9pwalk(char *path)
 	/* generate nwname*(wname[s]) */
 	for (n = i = 0; i < len; n++, i += elen + 1) {
 		if (n >= _9P_MAXWEL)
-			return NULL;
+			return -EINVAL;
 
 		cur = &path[i];
 		if (!(sep = strchr(cur, '/')))
@@ -521,13 +522,13 @@ _9pwalk(char *path)
 
 	pkt.len = bufpos - pkt.buf;
 	if ((r = _do9p(&pkt)))
-		return NULL;
+		return r;
 
 	/* From intro(5):
 	 *   size[4] Rwalk tag[2] nwqid[2] nwqid*(wqid[13])
 	 */
-	if (pkt.len < _9P_HEADSIZ + BIT16SZ)
-		return NULL;
+	if (pkt.len < BIT16SZ)
+		return -EBADMSG;
 	_ptoh16(&nwqid, &pkt);
 
 	/**
@@ -542,7 +543,8 @@ _9pwalk(char *path)
 	/* Retrieve the last qid. */
 	ADVBUF(&pkt, (nwqid - 1) * _9P_QIDSIZ);
 	if (_hqid(&fid->qid, &pkt))
-		return NULL;
+		return -EBADMSG;
 
-	return fid;
+	*dest = fid;
+	return 0;
 }

@@ -383,9 +383,8 @@ test_9pfs__rwalk_success(void)
 	_9pfid *f;
 
 	setcmd("rwalk_success\n");
-	f = _9pwalk("foo/bar");
+	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&f, "foo/bar"));
 
-	TEST_ASSERT_NOT_NULL(f);
 	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
 	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
 	TEST_ASSERT_EQUAL_INT(1337, f->qid.path);
