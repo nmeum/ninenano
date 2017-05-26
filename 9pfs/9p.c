@@ -87,7 +87,7 @@ _9pinit(sock_tcp_ep_t remote)
 void
 _9pclose(void)
 {
-	memset(fids, '\0', _9P_MAXFIDS);
+	memset(fids, '\0', _9P_MAXFIDS * sizeof(_9pfid));
 	sock_tcp_disconnect(&sock);
 }
 

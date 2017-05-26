@@ -31,7 +31,7 @@ setcmd(char *cmd)
 static void
 tear_down(void)
 {
-	memset(fids, '\0', _9P_MAXFIDS);
+	memset(fids, '\0', _9P_MAXFIDS * sizeof(_9pfid));
 }
 
 static void
