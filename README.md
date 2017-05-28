@@ -21,9 +21,16 @@ TODO
 Roadmap
 =======
 
-* [ ] Refactor Documentation
+* [ ] Simplify `_fibtbl` function
+* [x] Better error codes for _9pattach and _9pwalk
+* [ ] Check string length never exceeds UINT16_MAX
+* [ ] Buffer overflow checks for insertion commands
+* [ ] More DEBUG calls
 * [ ] s/char/unsiged char/
-* [ ] Write tests for _9pheader
+* [ ] Only do certian checks when compiled with -DDDEVHELP + assert(3)
+* [ ] Better errno return values to differentiate paths in unit tests
+* [ ] Consider comparison with end pointer to detect buffer overflow in packets
+* [ ] Refactor Documentation
 * [ ] Implement missing message types
 
 License

@@ -8,6 +8,14 @@ import (
 // Maps strings written by the client to the control socket to
 // server replies. Every test function needs an entry in this table.
 var ctlcmds = map[string]ServerReply{
+	"header_too_short1":    {HeaderTooShort1, protocol.Tversion},
+	"header_too_short2":    {HeaderTooShort2, protocol.Tversion},
+	"header_too_large":     {HeaderTooLarge, protocol.Tversion},
+	"header_wrong_type":    {HeaderWrongType, protocol.Tversion},
+	"header_invalid_type":  {HeaderInvalidType, protocol.Tversion},
+	"header_tag_mismatch":  {HeaderTagMismatch, protocol.Tversion},
+	"header_type_mismatch": {HeaderTypeMismatch, protocol.Tversion},
+
 	"rversion_success":          {RversionSuccess, protocol.Tversion},
 	"rversion_unknown":          {RversionUnknown, protocol.Tversion},
 	"rversion_msize_too_big":    {RversionMsizeTooBig, protocol.Tversion},
@@ -18,7 +26,114 @@ var ctlcmds = map[string]ServerReply{
 	"rattach_success":     {RattachSuccess, protocol.Tattach},
 	"rattach_invalid_len": {RattachInvalidLength, protocol.Tattach},
 
-	"rstat_success": {RstatSuccess, protocol.Tstat},
+	"rstat_success":       {RstatSuccess, protocol.Tstat},
+	"rstat_nstat_invalid": {RstatNstatInvalid, protocol.Tstat},
+
+	"rwalk_success":         {RwalkSuccess, protocol.Twalk},
+	"rwalk_invalid_len":     {RwalkInvalidLen, protocol.Twalk},
+	"rwalk_nwqid_too_large": {RwalkNwqidTooLarge, protocol.Twalk},
+}
+
+// Replies with a single byte. This is thus even shorter than the four-byte
+// length field and should not be parsed by the client succesfully.
+func HeaderTooShort1(b *bytes.Buffer) error {
+	b.Reset()
+	b.Write([]byte{0})
+	return nil
+}
+
+// Replies with a message containing a four-byte size field with a value
+// that is too small to make the message a valid 9p message.
+func HeaderTooShort2(b *bytes.Buffer) error {
+	b.Reset()
+	l := uint64(6)
+	b.Write([]byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	return nil
+}
+
+// Replies with a length field that is larger than the actual amount of bytes
+// send to the client.
+func HeaderTooLarge(b *bytes.Buffer) error {
+	b.Reset()
+
+	l := uint64(42)
+	b.Write([]byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	return nil
+}
+
+// Replies with a message containing a T-message type field.
+func HeaderWrongType(b *bytes.Buffer) error {
+	_, _, t, err := protocol.UnmarshalTversionPkt(b)
+	if err != nil {
+		return err
+	}
+
+	b.Reset()
+	b.Write([]byte{0, 0, 0, 0,
+		uint8(protocol.Tversion),
+		byte(t), byte(t >> 8),
+		byte(0), byte(0), byte(0), byte(0)})
+
+	{
+		l := uint64(b.Len())
+		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	}
+
+	return nil
+}
+
+// Replies with an invalid type value. The client should not be able to parse
+// this successfully.
+func HeaderInvalidType(b *bytes.Buffer) error {
+	_, _, t, err := protocol.UnmarshalTversionPkt(b)
+	if err != nil {
+		return err
+	}
+
+	b.Reset()
+	b.Write([]byte{0, 0, 0, 0,
+		uint8(protocol.Tlast),
+		byte(t), byte(t >> 8),
+		byte(0), byte(0), byte(0), byte(0)})
+
+	return nil
+}
+
+// Replies with a tag mismatched tag message. The client should be able
+// to parse this but should raise an error.
+func HeaderTagMismatch(b *bytes.Buffer) error {
+	_, _, t, err := protocol.UnmarshalTversionPkt(b)
+	if err != nil {
+		return err
+	}
+
+	t += 1
+
+	b.Reset()
+	b.Write([]byte{0, 0, 0, 0,
+		uint8(protocol.Rversion),
+		byte(t), byte(t >> 8),
+		byte(0), byte(0), byte(0), byte(0)})
+
+	return nil
+}
+
+// Replies with a type message that is valid but not expected by the
+// client. Thus the client should be able to parse this but should raise
+// an error.
+func HeaderTypeMismatch(b *bytes.Buffer) error {
+	_, _, t, err := protocol.UnmarshalTversionPkt(b)
+	if err != nil {
+		return err
+	}
+
+	b.Reset()
+	b.Write([]byte{0, 0, 0, 0,
+		uint8(protocol.Rversion),
+		byte(t), byte(t >> 8),
+		byte(0), byte(0), byte(0), byte(0)})
+
+	return nil
 }
 
 // Replies with the msize and version send by the client. This should always be
@@ -107,8 +222,10 @@ func RversionInvalidLength(b *bytes.Buffer) error {
 
 	protocol.MarshalRversionPkt(b, t, TMsize, TVersion)
 
-	var len uint64 = uint64(b.Len()) - 1
-	copy(b.Bytes(), []byte{uint8(len)})
+	{
+		var l uint64 = uint64(b.Len() - 1)
+		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	}
 
 	return nil
 }
@@ -140,9 +257,9 @@ func RattachSuccess(b *bytes.Buffer) error {
 	return nil
 }
 
-// Replies with a modified packet length field causing the packet length
-// to be one byte shorter than neccessary. The client should not be able
-// to parse this.
+// Replies with a modified packet length field causing the packet length to be
+// one byte shorter than neccessary. The qid should therefore be invalind and
+// the client should not be able to parse this.
 func RattachInvalidLength(b *bytes.Buffer) error {
 	_, _, _, _, t, err := protocol.UnmarshalTattachPkt(b)
 	if err != nil {
@@ -151,8 +268,10 @@ func RattachInvalidLength(b *bytes.Buffer) error {
 
 	protocol.MarshalRattachPkt(b, t, protocol.QID{})
 
-	var l uint64 = uint64(b.Len()) - 1
-	copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	{
+		var l uint64 = uint64(b.Len() - 1)
+		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	}
 
 	return nil
 }
@@ -189,5 +308,113 @@ func RstatSuccess(b *bytes.Buffer) error {
 	protocol.Marshaldir(&B, dir)
 
 	protocol.MarshalRstatPkt(b, t, B.Bytes())
+	return nil
+}
+
+// Replies with a stat message containing an invalid two-byte nstat
+// field which would cause the message to be longer than indicated in
+// the size field.
+func RstatNstatInvalid(b *bytes.Buffer) error {
+	_, t, err := protocol.UnmarshalTstatPkt(b)
+	if err != nil {
+		return err
+	}
+
+	var B bytes.Buffer
+	var D protocol.Dir
+
+	protocol.Marshaldir(&B, D)
+
+	var l uint64
+	var n uint16 = uint16(1337)
+
+	b.Reset()
+	b.Write([]byte{0, 0, 0, 0,
+		uint8(protocol.Rstat),
+		byte(t), byte(t >> 8),
+		uint8(n >> 0),
+		uint8(n >> 8),
+	})
+
+	b.Write(B.Bytes())
+
+	{
+		l = uint64(b.Len())
+		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	}
+
+	return nil
+}
+
+// Replies with a valid Rwalk message. The last QID is different then
+// the other ones to test off-by-one errors. The client must be able
+// to parse this R-message.
+func RwalkSuccess(b *bytes.Buffer) error {
+	_, _, p, t, err := protocol.UnmarshalTwalkPkt(b)
+	if err != nil {
+		return err
+	}
+	plen := len(p)
+
+	q := protocol.QID{
+		Path:    23,
+		Type:    42,
+		Version: 5,
+	}
+
+	var qids []protocol.QID
+
+	for i := 0; i < plen; i++ {
+		qids = append(qids, q)
+	}
+
+	qids[plen-1] = protocol.QID{
+		Path:    1337,
+		Type:    23,
+		Version: 42,
+	}
+
+	protocol.MarshalRwalkPkt(b, t, qids)
+	return nil
+}
+
+// Replies with a message that is too short to be a valid Rwalk message.
+// The client should therefore reject this message.
+func RwalkInvalidLen(b *bytes.Buffer) error {
+	_, _, p, t, err := protocol.UnmarshalTwalkPkt(b)
+	if err != nil {
+		return err
+	}
+
+	var qids []protocol.QID
+	for i := 0; i < len(p); i++ {
+		qids = append(qids, protocol.QID{})
+	}
+
+	protocol.MarshalRwalkPkt(b, t, qids)
+
+	{
+		var l uint64 = uint64(10)
+		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	}
+
+	return nil
+}
+
+// Replies with a Rwalk message which contains an `nwqid` field that
+// exceeds MAXWELEM and should therefore be considered invalid by the
+// client.
+func RwalkNwqidTooLarge(b *bytes.Buffer) error {
+	_, _, _, t, err := protocol.UnmarshalTwalkPkt(b)
+	if err != nil {
+		return err
+	}
+
+	var qids []protocol.QID
+	for i := 0; i < 17; i++ {
+		qids = append(qids, protocol.QID{})
+	}
+
+	protocol.MarshalRwalkPkt(b, t, qids)
 	return nil
 }

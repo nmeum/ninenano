@@ -10,14 +10,113 @@
 
 #include "embUnit.h"
 
-/* TCP control socket */
-static sock_tcp_t ctlsock;
+/**
+ * TCP control socket
+ */
+static sock_tcp_t csock;
 
-/* Remote address for control socket */
-static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
+/**
+ * 9P fid table
+ */
+extern _9pfid fids[_9P_MAXFIDS];
 
-/* Remote address for 9P protocol socket */
-static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
+static void
+setcmd(char *cmd)
+{
+	printf("RUNNING: %s", cmd);
+	if (sock_tcp_write(&csock, cmd, strlen(cmd)) < 0)
+		TEST_FAIL("Couldn't write to control server");
+}
+
+static void
+tear_down(void)
+{
+	memset(fids, '\0', _9P_MAXFIDS * sizeof(_9pfid));
+}
+
+static void
+set_up(void)
+{
+	xtimer_usleep(1000);
+}
+
+/**
+ * @defgroup Tests for utility functios from `9pfs/util.c`.
+ * @{
+ */
+
+static void
+test_9putil__pstring_and_hstring(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[10];
+	char dest[10];
+
+	_pstring(buf, "foobar");
+	pkt.buf = buf;
+	pkt.len = 10;
+
+	TEST_ASSERT_EQUAL_INT(0, _hstring(dest, 10, &pkt));
+	TEST_ASSERT_EQUAL_STRING("foobar", (char*)dest);
+}
+
+static void
+test_9putil__pstring_empty_string(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[2];
+	char dest[2];
+
+	_pstring(buf, NULL);
+	pkt.buf = buf;
+	pkt.len = 4;
+
+	TEST_ASSERT_EQUAL_INT(0, _hstring(dest, 2, &pkt));
+	TEST_ASSERT_EQUAL_STRING("", (char*)dest);
+}
+
+static void
+test_9putil__hstring_invalid1(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[10];
+	char dest[10];
+
+	_pstring(buf, "kek");
+	pkt.buf = buf;
+	pkt.len = BIT16SZ - 1;
+
+	TEST_ASSERT_EQUAL_INT(-1, _hstring(dest, 10, &pkt));
+}
+
+static void
+test_9putil__hstring_invalid2(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[5];
+	char dest[5];
+
+	pkt.len = 5;
+	_htop16(buf, 5);
+
+	TEST_ASSERT_EQUAL_INT(-1, _hstring(dest, 5, &pkt));
+}
+
+static void
+test_9putil__hstring_invalid3(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[5];
+	char dest[5];
+
+	_pstring(buf, "foo");
+	_htop16(buf, 42);
+
+	pkt.buf = buf;
+	pkt.len = 5;
+
+	TEST_ASSERT_EQUAL_INT(-1, _hstring(dest, 5, &pkt));
+}
 
 static void
 test_9putil__fidtbl_add(void)
@@ -88,24 +187,50 @@ test_9putil__fidtbl_delete_rootfid(void)
 	TEST_ASSERT_NULL(_fidtbl(_9P_ROOTFID, DEL));
 }
 
+static void
+test_9putil__newfid(void)
+{
+	_9pfid *f1, *f2;
+
+	f1 = newfid();
+	TEST_ASSERT_NOT_NULL(f1);
+
+	f2 = _fidtbl(f1->fid, GET);
+	TEST_ASSERT_NOT_NULL(f2);
+
+	TEST_ASSERT_EQUAL_INT(f1->fid, f2->fid);
+}
+
 Test*
 tests_9putil_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
+		new_TestFixture(test_9putil__pstring_and_hstring),
+		new_TestFixture(test_9putil__hstring_invalid1),
+		new_TestFixture(test_9putil__hstring_invalid2),
+		new_TestFixture(test_9putil__hstring_invalid3),
+		new_TestFixture(test_9putil__pstring_empty_string),
+
 		new_TestFixture(test_9putil__fidtbl_add),
 		new_TestFixture(test_9putil__fidtbl_add_invalid),
 		new_TestFixture(test_9putil__fidtbl_add_full),
 		new_TestFixture(test_9putil__fidtbl_get),
 		new_TestFixture(test_9putil__fidtbl_delete),
 		new_TestFixture(test_9putil__fidtbl_delete_rootfid),
+
+		new_TestFixture(test_9putil__newfid),
 	};
 
 	/* Use _9pclose as tear down function to reset the fid table. */
-	EMB_UNIT_TESTCALLER(_9putil_tests, NULL, _9pclose, fixtures);
+	EMB_UNIT_TESTCALLER(_9putil_tests, NULL, tear_down, fixtures);
 	return (Test*)&_9putil_tests;
 }
 
+/**@}*/
+
 /**
+ * @defgroup Tests for protocol functions from `9pfs/9p.c`.
+ *
  * You might be wondering why there are no comments below this points.
  * This is the case because the purpose of the various test cases is
  * explained in the file `tests/server/tests.go` instead.
@@ -116,26 +241,52 @@ tests_9putil_tests(void)
  */
 
 static void
-setcmd(char *cmd)
+test_9pfs__header_too_short1(void)
 {
-	if (sock_tcp_write(&ctlsock, cmd, strlen(cmd)) < 0)
-		TEST_FAIL("Couldn't write to control server");
+	setcmd("test_9pfs__header_too_short1\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-set_up(void)
+test_9pfs__header_too_short2(void)
 {
-	if (sock_tcp_connect(&ctlsock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0)
-		TEST_FAIL("Couldn't connect to control server");
-	if (_9pinit(pr))
-		TEST_FAIL("_9pinit failed");
+	setcmd("test_9pfs__header_too_short2\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-tear_down(void)
+test_9pfs__header_too_large(void)
 {
-	_9pclose();
-	sock_tcp_disconnect(&ctlsock);
+	setcmd("header_too_large\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+}
+
+static void
+test_9pfs__header_wrong_type(void)
+{
+	setcmd("header_wrong_type\n");
+	TEST_ASSERT_EQUAL_INT(-ENOTSUP, _9pversion());
+}
+
+static void
+test_9pfs__header_invalid_type(void)
+{
+	setcmd("header_invalid_type\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+}
+
+static void
+test_9pfs__header_tag_mismatch(void)
+{
+	setcmd("header_tag_mismatch\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+}
+
+static void
+test_9pfs__header_type_mismatch(void)
+{
+	setcmd("header_type_mismatch\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
@@ -186,9 +337,8 @@ test_9pfs__rattach_success(void)
 	_9pfid *fid;
 
 	setcmd("rattach_success\n");
-	fid = _9pattach("foo", NULL);
+	TEST_ASSERT_EQUAL_INT(0, _9pattach(&fid, "foo", NULL));
 
-	TEST_ASSERT_NOT_NULL(fid);
 	TEST_ASSERT_EQUAL_STRING("", (char*)fid->path);
 	TEST_ASSERT(fid->fid > 0);
 }
@@ -196,8 +346,10 @@ test_9pfs__rattach_success(void)
 static void
 test_9pfs__rattach_invalid_len(void)
 {
+	_9pfid *fid;
+
 	setcmd("rattach_invalid_len\n");
-	TEST_ASSERT_NULL(_9pattach("foobar", NULL));
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pattach(&fid, "foobar", NULL));
 }
 
 static void
@@ -231,10 +383,70 @@ test_9pfs__rstat_success(void)
 	TEST_ASSERT_EQUAL_STRING("testfile", (char*)f.path);
 }
 
+static void
+test_9pfs__nstat_invalid(void)
+{
+	_9pfid f;
+	struct stat st;
+
+	setcmd("rstat_nstat_invalid\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pstat(&f, &st));
+}
+
+static void
+test_9pfs__rwalk_success(void)
+{
+	_9pfid *f;
+
+	setcmd("rwalk_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&f, "foo/bar"));
+
+	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
+	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
+	TEST_ASSERT_EQUAL_INT(1337, f->qid.path);
+}
+
+static void
+test_9pfs__rwalk_invalid_len(void)
+{
+	_9pfid *f;
+
+	setcmd("rwalk_invalid_len\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&f, "foobar"));
+}
+
+static void
+test_9pfs__rwalk_path_too_long(void)
+{
+	_9pfid *f;
+	char *path;
+
+	path = "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17";
+	TEST_ASSERT_EQUAL_INT(-EINVAL, _9pwalk(&f, path));
+
+}
+
+static void
+test_9pfs__rwalk_nwqid_too_large(void)
+{
+	_9pfid *f;
+
+	setcmd("rwalk_nwqid_too_large\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&f, "foo"));
+}
+
 Test*
 tests_9pfs_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
+		new_TestFixture(test_9pfs__header_too_short1),
+		new_TestFixture(test_9pfs__header_too_short2),
+		new_TestFixture(test_9pfs__header_too_large),
+		new_TestFixture(test_9pfs__header_wrong_type),
+		new_TestFixture(test_9pfs__header_invalid_type),
+		new_TestFixture(test_9pfs__header_tag_mismatch),
+		new_TestFixture(test_9pfs__header_type_mismatch),
+
 		new_TestFixture(test_9pfs__rversion_success),
 		new_TestFixture(test_9pfs__rversion_unknown),
 		new_TestFixture(test_9pfs__rversion_msize_too_big),
@@ -246,15 +458,26 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__rattach_invalid_len),
 
 		new_TestFixture(test_9pfs__rstat_success),
+		new_TestFixture(test_9pfs__nstat_invalid),
+
+		new_TestFixture(test_9pfs__rwalk_success),
+		new_TestFixture(test_9pfs__rwalk_invalid_len),
+		new_TestFixture(test_9pfs__rwalk_path_too_long),
+		new_TestFixture(test_9pfs__rwalk_nwqid_too_large),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
 	return (Test*)&_9pfs_tests;
 }
 
+/**@}*/
+
 int
 main(void)
 {
+	static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
+	static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
+
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
 
@@ -264,10 +487,23 @@ main(void)
 	cr.port = CPORT;
 	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, REMOTE_ADDR);
 
+	if (sock_tcp_connect(&csock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0) {
+		puts("Couldn't connect to control server");
+		return EXIT_FAILURE;
+	}
+
+	if (_9pinit(pr)) {
+		puts("_9pinit failed");
+		return EXIT_FAILURE;
+	}
+
 	TESTS_START();
 	TESTS_RUN(tests_9putil_tests());
 	TESTS_RUN(tests_9pfs_tests());
 	TESTS_END();
+
+	sock_tcp_disconnect(&csock);
+	_9pclose();
 
 	return 0;
 }

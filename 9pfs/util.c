@@ -1,6 +1,7 @@
-#include <string.h>
+#include <sys/types.h>
 
 #include "9pfs.h"
+#include "random.h"
 
 extern _9pfid fids[_9P_MAXFIDS];
 
@@ -27,10 +28,11 @@ _fidtbl(uint32_t fid, _9pfidop op)
 	/* A value of 0 is used to indicate an unused table entry. */
 	if (!fid)
 		return NULL;
+
+	hash = i = fid % _9P_MAXFIDS;
 	if (op == ADD)
 		fid = 0;
 
-	hash = i = fid % _9P_MAXFIDS;
 	do {
 		if ((ret = &fids[i])->fid == fid)
 			break;
@@ -47,6 +49,35 @@ _fidtbl(uint32_t fid, _9pfidop op)
 	}
 
 	return ret;
+}
+
+/**
+ * Finds a new **unique** fid for the fid table. Insert it into the fid
+ * table and returns a pointer to the new fid table entry.
+ *
+ * @return Pointer to fid table entry or NULL if the fid table is full.
+ */
+_9pfid*
+newfid(void)
+{
+	_9pfid *r;
+	size_t i;
+	uint32_t fid;
+
+	for (i = 1; i < _9P_MAXFIDS; i++) {
+		fid = random_uint32_range(1, UINT32_MAX);
+		if (_fidtbl(fid, GET))
+			continue;
+
+		/* TODO room for optimization don't call _fidtbl twice. */
+		r = _fidtbl(fid, ADD);
+		assert(r != NULL);
+
+		r->fid = fid;
+		return r;
+	}
+
+	return NULL;
 }
 
 /**
@@ -68,7 +99,7 @@ _fidtbl(uint32_t fid, _9pfidop op)
 #endif
 
 /**
- * \defgroup Functions for converting from host byte order to the byte
+ * @defgroup Functions for converting from host byte order to the byte \
  *   order used by the 9P protocol.
  *
  * Functions for converting integers encoded using the byte order used
@@ -124,8 +155,8 @@ _htop64(uint8_t *buf, uint64_t val)
 /**@}*/
 
 /**
- * \defgroup Functions for converting from the byte order used by the 9P
- *   protocol to the byte order used by the host.
+ * @defgroup Functions for converting from the byte order used by the \
+ *   9P protocol to the byte order used by the host.
  *
  * Functions for converting integers encoded using the byte order used
  * by the 9P protocol to the one used by the CPU (the host system).
@@ -143,8 +174,7 @@ void
 _ptoh8(uint8_t *dest, _9ppkt *pkt)
 {
 	*dest = *pkt->buf;
-	pkt->buf += BIT8SZ;
-	pkt->len -= BIT8SZ;
+	ADVBUF(pkt, BIT8SZ);
 }
 
 void
@@ -152,9 +182,7 @@ _ptoh16(uint16_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT16SZ);
 	*dest = _9p_swap(*dest, s);
-
-	pkt->buf += BIT16SZ;
-	pkt->len -= BIT16SZ;
+	ADVBUF(pkt, BIT16SZ);
 }
 
 void
@@ -162,9 +190,7 @@ _ptoh32(uint32_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT32SZ);
 	*dest = _9p_swap(*dest, l);
-
-	pkt->buf += BIT32SZ;
-	pkt->len -= BIT32SZ;
+	ADVBUF(pkt, BIT32SZ);
 }
 
 void
@@ -172,16 +198,14 @@ _ptoh64(uint64_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT64SZ);
 	*dest = _9p_swap(*dest, ll);
-
-	pkt->buf += BIT64SZ;
-	pkt->len -= BIT64SZ;
+	ADVBUF(pkt, BIT64SZ);
 }
 
 /**@}*/
 
 /**
- * \defgroup Functions for converting strings from host representation
- * to protocol representation and vice versa.
+ * @defgroup Functions for converting strings from host representation \
+ *   to protocol representation and vice versa.
  * @{
  */
 
@@ -252,7 +276,7 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
 {
 	uint16_t siz;
 
-	if (pkt->len <= BIT16SZ)
+	if (pkt->len < BIT16SZ)
 		return -1;
 	_ptoh16(&siz, pkt);
 
@@ -267,6 +291,13 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
 
 	return 0;
 }
+
+/**@}*/
+
+/**
+ * @defgroup Functions for converting qids.
+ * @{
+ */
 
 /**
  * From intro(5):
