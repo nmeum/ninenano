@@ -503,8 +503,10 @@ _9pwalk(_9pfid **dest, char *path)
 
 	/* generate nwname*(wname[s]) */
 	for (n = i = 0; i < len; n++, i += elen + 1) {
-		if (n >= _9P_MAXWEL)
-			return -EINVAL;
+		if (n >= _9P_MAXWEL) {
+			r = -EINVAL;
+			goto err;
+		}
 
 		cur = &path[i];
 		if (!(sep = strchr(cur, '/')))
@@ -522,13 +524,15 @@ _9pwalk(_9pfid **dest, char *path)
 
 	pkt.len = bufpos - pkt.buf;
 	if ((r = _do9p(&pkt)))
-		return r;
+		goto err;
 
 	/* From intro(5):
 	 *   size[4] Rwalk tag[2] nwqid[2] nwqid*(wqid[13])
 	 */
-	if (pkt.len < BIT16SZ)
-		return -EBADMSG;
+	if (pkt.len < BIT16SZ) {
+		r = -EBADMSG;
+		goto err;
+	}
 	_ptoh16(&nwqid, &pkt);
 
 	/**
@@ -537,14 +541,25 @@ _9pwalk(_9pfid **dest, char *path)
 	 *   elementwise walk that failed.
 	 */
 	DEBUG("nwqid: %d\n", nwqid);
-	if (nwqid != n || nwqid > pkt.len || nwqid > _9P_MAXWEL) /* XXX */
-		return -EBADMSG;
+	if (nwqid != n || nwqid > pkt.len || nwqid > _9P_MAXWEL) { /* XXX */
+		r = -EBADMSG;
+		goto err;
+	}
 
 	/* Retrieve the last qid. */
 	ADVBUF(&pkt, (nwqid - 1) * _9P_QIDSIZ);
-	if (_hqid(&fid->qid, &pkt))
-		return -EBADMSG;
+	if (_hqid(&fid->qid, &pkt)) {
+		r = -EBADMSG;
+		goto err;
+	}
+
+	strncpy(fid->path, path, _9P_PTHMAX);
+	fid->path[_9P_PTHMAX - 1] = '\0';
 
 	*dest = fid;
 	return 0;
+
+err:
+	assert(_fidtbl(fid->fid, DEL) != NULL);
+	return r;
 }

@@ -187,6 +187,20 @@ test_9putil__fidtbl_delete_rootfid(void)
 	TEST_ASSERT_NULL(_fidtbl(_9P_ROOTFID, DEL));
 }
 
+static void
+test_9putil__newfid(void)
+{
+	_9pfid *f1, *f2;
+
+	f1 = newfid();
+	TEST_ASSERT_NOT_NULL(f1);
+
+	f2 = _fidtbl(f1->fid, GET);
+	TEST_ASSERT_NOT_NULL(f2);
+
+	TEST_ASSERT_EQUAL_INT(f1->fid, f2->fid);
+}
+
 Test*
 tests_9putil_tests(void)
 {
@@ -203,6 +217,8 @@ tests_9putil_tests(void)
 		new_TestFixture(test_9putil__fidtbl_get),
 		new_TestFixture(test_9putil__fidtbl_delete),
 		new_TestFixture(test_9putil__fidtbl_delete_rootfid),
+
+		new_TestFixture(test_9putil__newfid),
 	};
 
 	/* Use _9pclose as tear down function to reset the fid table. */
