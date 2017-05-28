@@ -449,6 +449,58 @@ test_9pfs__ropen_success(void)
 	TEST_ASSERT_EQUAL_INT(1337, f.iounit);
 }
 
+static void
+test_9pfs__rread_success(void)
+{
+	_9pfid f;
+	char dest[7];
+
+	setcmd("rread_success\n");
+
+	f.fid = 42;
+	f.iounit = 50;
+
+	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 6));
+	dest[6] = '\0';
+	TEST_ASSERT_EQUAL_STRING("Hello!", (char*)dest);
+}
+
+static void
+test_9pfs__rread_with_offset(void)
+{
+	_9pfid f;
+	char dest[11];
+
+	// Set command twice because with an iounilt of 5
+	// we need to send two requests to receive the
+	// entire file.
+	setcmd("rread_with_offset\n");
+	setcmd("rread_with_offset\n");
+
+	f.fid = 23;
+	f.iounit = 5;
+
+	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 10));
+	dest[10] = '\0';
+	TEST_ASSERT_EQUAL_STRING("1234567890", (char*)dest);
+}
+
+static void
+test_9pfs__rread_with_larger_count(void)
+{
+	_9pfid f;
+	char dest[7];
+
+	setcmd("rread_success\n");
+
+	f.fid = 5;
+	f.iounit = 100;
+
+	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 100));
+	dest[6] = '\0';
+	TEST_ASSERT_EQUAL_STRING("Hello!", (char*)dest);
+}
+
 Test*
 tests_9pfs_tests(void)
 {
@@ -480,6 +532,10 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__rwalk_nwqid_too_large),
 
 		new_TestFixture(test_9pfs__ropen_success),
+
+		new_TestFixture(test_9pfs__rread_success),
+		new_TestFixture(test_9pfs__rread_with_offset),
+		new_TestFixture(test_9pfs__rread_with_larger_count),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);

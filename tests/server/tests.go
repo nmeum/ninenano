@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"github.com/Harvey-OS/ninep/protocol"
 )
 
@@ -34,6 +35,9 @@ var ctlcmds = map[string]ServerReply{
 	"rwalk_nwqid_too_large": {RwalkNwqidTooLarge, protocol.Twalk},
 
 	"ropen_success": {RopenSuccess, protocol.Topen},
+
+	"rread_success":     {RreadSuccess, protocol.Tread},
+	"rread_with_offset": {RreadWithOffset, protocol.Tread},
 }
 
 // Replies with a single byte. This is thus even shorter than the four-byte
@@ -430,5 +434,46 @@ func RopenSuccess(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRopenPkt(b, t, protocol.QID{}, 1337)
+	return nil
+}
+
+// Replies with a valid Rread message. The data field of the message
+// should hold the string `Hello!`. The client must be able to parse
+// this. This function ignores the count sent by the client.
+func RreadSuccess(b *bytes.Buffer) error {
+	_, _, _, t, err := protocol.UnmarshalTreadPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRreadPkt(b, t, []byte("Hello!"))
+	return nil
+}
+
+// Replies with a valid Rread message. The data field of the message is
+// set to `1234567890`. Contrary to RreadSuccess this function respects
+// the offset and count send by the client.
+func RreadWithOffset(b *bytes.Buffer) error {
+	_, o, l, t, err := protocol.UnmarshalTreadPkt(b)
+	if err != nil {
+		return err
+	}
+
+	poff := int(o)
+	plen := int(l)
+
+	hstr := "1234567890"
+	hlen := len(hstr)
+
+	if poff > hlen {
+		return errors.New("offset is too large")
+	}
+	if plen > hlen {
+		hlen = plen
+	}
+
+	data := hstr[poff : poff+plen]
+
+	protocol.MarshalRreadPkt(b, t, []byte(data))
 	return nil
 }

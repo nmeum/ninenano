@@ -613,3 +613,81 @@ _9popen(_9pfid *f, int fl)
 
 	return 0;
 }
+
+/**
+ * From intro(5):
+ *   The read request asks for count bytes of data from the file
+ *   identified by fid, which must be opened for reading, start-
+ *   ing offset bytes after the beginning of the file.
+ *
+ * @param f Fid from which data should be read.
+ * @param dest Pointer to a buffer to which the received data should be
+ * 	written.
+ * @param count Amount of data that should be read.
+ * @return `0` on success, on failure a negative errno is returned.
+ */
+int
+_9pread(_9pfid *f, char *dest, size_t count)
+{
+	int r;
+	size_t n;
+	uint32_t pcnt, ocnt;
+	uint8_t *bufpos;
+	_9ppkt pkt;
+
+	n = 0;
+	while (n < count) {
+		bufpos = pkt.buf = buffer;
+		DEBUG("Sending Tread with offset %zu\n", n);
+
+		/* From intro(5):
+		 *   size[4] Tread tag[2] fid[4] offset[8] count[4]
+		 */
+		pkt.type = Tread;
+		bufpos = _htop32(bufpos, f->fid);
+		bufpos = _htop64(bufpos, n);
+
+		if (count - n <= UINT32_MAX)
+			pcnt = count - n;
+		else
+			pcnt = UINT32_MAX;
+
+		if (pcnt > f->iounit)
+			pcnt = f->iounit;
+		bufpos = _htop32(bufpos, pcnt);
+
+		ocnt = pcnt;
+		DEBUG("Requesting %zu bytes from the server\n", pcnt);
+
+		pkt.len = bufpos - pkt.buf;
+		if ((r = _do9p(&pkt)))
+			return r;
+
+		/* From intro(5):
+		 *   size[4] Rread tag[2] count[4] data[count]
+		 */
+		if (pkt.len < BIT32SZ)
+			return -EBADMSG;
+		_ptoh32(&pcnt, &pkt);
+
+		DEBUG("Received %zu bytes from the server\n", pcnt);
+		if (pkt.len < pcnt || pcnt > count)
+			return -EBADMSG;
+
+		/* From open(5):
+		 *   If the offset field is greater than or equal to the
+		 *   number of bytes in the file, a count of zero will
+		 *   be returned.
+		 */
+		if (!pcnt)
+			return -EFBIG;
+
+		memcpy(&dest[n], pkt.buf, pcnt);
+
+		n += pcnt;
+		if (pcnt < ocnt)
+			break;
+	}
+
+	return 0;
+}

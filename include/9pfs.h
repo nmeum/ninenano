@@ -342,6 +342,7 @@ int _9pattach(_9pfid**, char*, char*);
 int _9pstat(_9pfid*, struct stat*);
 int _9pwalk(_9pfid**, char*);
 int _9popen(_9pfid*, int);
+int _9pread(_9pfid*, char*, size_t);
 
 _9pfid* _fidtbl(uint32_t, _9pfidop);
 _9pfid* newfid(void);
