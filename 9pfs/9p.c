@@ -490,7 +490,7 @@ _9pwalk(_9pfid **dest, char *path)
 	bufpos = pkt.buf = buffer;
 
 	len = strlen(path);
-	if (len > UINT16_MAX)
+	if (len >= _9P_PTHMAX)
 		return -EINVAL;
 	if (!(fid = newfid()))
 		return -ENFILE;
@@ -556,8 +556,8 @@ _9pwalk(_9pfid **dest, char *path)
 		goto err;
 	}
 
-	strncpy(fid->path, path, _9P_PTHMAX);
-	fid->path[_9P_PTHMAX - 1] = '\0';
+	/* Copy string, overflow check is performed above. */
+	strcpy(fid->path, path);
 
 	*dest = fid;
 	return 0;
