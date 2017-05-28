@@ -154,11 +154,30 @@ enum {
  *   tory), 0x40000000 (DMAPPEND, append only), 0x20000000
  *   (DMEXCL, exclusive use), 0x04000000 (DMTMP, temporary);
  *   these are echoed in Qid.type.
+ *
+ * These definition have been copied from the Plan 9 sourcetree.
+ * The file can be found at the location `sys/include/libc.h`.
  */
 #define DMDIR    0x80000000 /**< Mode bit for directories. */
 #define DMAPPEND 0x40000000 /**< Mode bit for append only files. */
 #define DMEXCL   0x20000000 /**< Mode bit for exclusive use files. */
 #define DMTMP    0x04000000 /**< Mode bit for non-backed-up file. */
+
+/* From open(5):
+ *   The mode field determines the type of I/O: 0 (called OREAD in
+ *   <libc.h>), 1 (OWRITE), 2 (ORDWR), and 3 (OEXEC) mean read access,
+ *   write access, read and write access, and execute access, to be
+ *   checked against the per- missions for the file. In addition, if
+ *   mode has the OTRUNC (0x10) bit set, the file is to be truncated
+ *   [...]
+ *
+ * These definition have been copied from the Plan 9 sourcetree.
+ * The file can be found at the location `sys/include/libc.h`.
+ */
+#define OREAD  0  /**< open for read */
+#define OWRITE 1  /**< write */
+#define ORDWR  2  /**< read and write */
+#define OTRUNC 16 /**< or'ed in (except for exec), truncate file first */
 
 /**
  * Valid values for the type field of a 9P message. This has been copied
@@ -264,6 +283,11 @@ typedef struct {
 	 * The qid associated with this fid.
 	 */
 	_9pqid qid;
+
+	/**
+	 * iounit for this file as returned by open(5).
+	 */
+	uint32_t iounit;
 } _9pfid;
 
 /**
@@ -317,6 +341,7 @@ int _9pversion(void);
 int _9pattach(_9pfid**, char*, char*);
 int _9pstat(_9pfid*, struct stat*);
 int _9pwalk(_9pfid**, char*);
+int _9popen(_9pfid*, int);
 
 _9pfid* _fidtbl(uint32_t, _9pfidop);
 _9pfid* newfid(void);

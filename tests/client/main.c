@@ -437,6 +437,18 @@ test_9pfs__rwalk_nwqid_too_large(void)
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&f, "foo"));
 }
 
+static void
+test_9pfs__ropen_success(void)
+{
+	_9pfid f;
+
+	f.fid = 42;
+
+	setcmd("ropen_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9popen(&f, 0));
+	TEST_ASSERT_EQUAL_INT(1337, f.iounit);
+}
+
 Test*
 tests_9pfs_tests(void)
 {
@@ -466,6 +478,8 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__rwalk_invalid_len),
 		new_TestFixture(test_9pfs__rwalk_path_too_long),
 		new_TestFixture(test_9pfs__rwalk_nwqid_too_large),
+
+		new_TestFixture(test_9pfs__ropen_success),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);

@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <byteorder.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/types.h>
 
 #include "xtimer.h"
@@ -565,4 +566,50 @@ _9pwalk(_9pfid **dest, char *path)
 err:
 	assert(_fidtbl(fid->fid, DEL) != NULL);
 	return r;
+}
+
+/**
+ * From open(5):
+ *   The open request asks the file server to check permissions and
+ *   prepare a fid for I/O with subsequent read and write messages.
+ *
+ * @param f Fid which should be opened for I/O.
+ * @param fl Flags used for opening the fid for I/O (see open(3)).
+ * @return `0` on success, on error a negative errno is returned.
+ */
+int
+_9popen(_9pfid *f, int fl)
+{
+	int r;
+	uint8_t *bufpos, mode;
+	_9ppkt pkt;
+
+	bufpos = pkt.buf = buffer;
+
+	/* Convert the mode. This assumes that OREAD == O_RDONLY,
+	 * O_WRONLY == OWRITE and O_RDWR == ORDWR which should always
+	 * be the case on RIOT. */
+	mode = fl & O_ACCMODE;
+	if (fl & O_TRUNC)
+		mode |= OTRUNC;
+
+	/* From intro(5):
+	 *   size[4] Topen tag[2] fid[4] mode[1]
+	 */
+	pkt.type = Topen;
+	bufpos = _htop32(bufpos, f->fid);
+	bufpos = _htop8(bufpos, mode);
+
+	pkt.len = bufpos - pkt.buf;
+	if ((r = _do9p(&pkt)))
+		return r;
+
+	/* From intro(5):
+	 *   size[4] Ropen tag[2] qid[13] iounit[4]
+	 */
+	if (_hqid(&f->qid, &pkt) || pkt.len < BIT32SZ)
+		return -EBADMSG;
+	_ptoh32(&f->iounit, &pkt);
+
+	return 0;
 }

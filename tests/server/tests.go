@@ -32,6 +32,8 @@ var ctlcmds = map[string]ServerReply{
 	"rwalk_success":         {RwalkSuccess, protocol.Twalk},
 	"rwalk_invalid_len":     {RwalkInvalidLen, protocol.Twalk},
 	"rwalk_nwqid_too_large": {RwalkNwqidTooLarge, protocol.Twalk},
+
+	"ropen_success": {RopenSuccess, protocol.Topen},
 }
 
 // Replies with a single byte. This is thus even shorter than the four-byte
@@ -416,5 +418,17 @@ func RwalkNwqidTooLarge(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRwalkPkt(b, t, qids)
+	return nil
+}
+
+// Replies with a valid Ropen message. The iounit of the reply will
+// always be `1337`. The client must be able to parse this.
+func RopenSuccess(b *bytes.Buffer) error {
+	_, _, t, err := protocol.UnmarshalTopenPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRopenPkt(b, t, protocol.QID{}, 1337)
 	return nil
 }
