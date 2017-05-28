@@ -404,6 +404,8 @@ test_9pfs__rwalk_success(void)
 	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
 	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
 	TEST_ASSERT_EQUAL_INT(1337, f->qid.path);
+
+	TEST_ASSERT_EQUAL_STRING("foo/bar", (char*)f->path);
 }
 
 static void
