@@ -350,9 +350,12 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
 		return -ENFILE;
 	fid->fid = _9P_ROOTFID;
 
-	*fid->path = '\0'; /* empty string */
-	if (_hqid(&fid->qid, &pkt))
+	if (_hqid(&fid->qid, &pkt)) {
+		fid->fid = 0; /* mark fid as free. */
 		return -EBADMSG;
+	}
+
+	*fid->path = '\0'; /* empty string */
 
 	*dest = fid;
 	return 0;
