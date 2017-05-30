@@ -611,6 +611,15 @@ _9popen(_9pfid *f, int fl)
 		return -EBADMSG;
 	_ptoh32(&f->iounit, &pkt);
 
+	/* From open(5):
+	 *   The iounit field returned by open and create may be zero.
+	 *   If it is not, it is the maximum number of bytes that are
+	 *   guaranteed to be read from or written to the file without
+	 *   breaking the I/O transfer into multiple 9P messages
+	 */
+	if (!f->iounit)
+		f->iounit = msize - _9P_IOHDRSIZ;
+
 	return 0;
 }
 
