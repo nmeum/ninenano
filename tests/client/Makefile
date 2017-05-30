@@ -8,7 +8,7 @@ BOARD = native
 QUIET ?= 1
 
 # Path to the RIOT submodule
-RIOTBASE ?= $(CURDIR)/../../RIOT
+RIOTBASE ?= $(CURDIR)/../../vendor/RIOT
 
 # CFLAGS for debugging purposes
 CFLAGS += -DDEVELHELP -ggdb
