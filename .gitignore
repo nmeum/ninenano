@@ -1,3 +1,6 @@
 tests/unit/server/src/
 tests/unit/client/bin/
 tests/unit/server/server
+tests/integration/server/src/
+tests/integration/client/bin/
+tests/integration/server/server
