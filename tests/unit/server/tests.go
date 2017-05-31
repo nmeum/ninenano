@@ -38,6 +38,7 @@ var ctlcmds = map[string]ServerReply{
 
 	"rread_success":     {RreadSuccess, protocol.Tread},
 	"rread_with_offset": {RreadWithOffset, protocol.Tread},
+	"rread_count_zero":  {RreadCountZero, protocol.Tread},
 }
 
 // Replies with a single byte. This is thus even shorter than the four-byte
@@ -475,5 +476,18 @@ func RreadWithOffset(b *bytes.Buffer) error {
 	data := hstr[poff : poff+plen]
 
 	protocol.MarshalRreadPkt(b, t, []byte(data))
+	return nil
+}
+
+// Replies with a valid Rread message which contains a count field with
+// the value `0`. The client must be able to parse this but should
+// treat the message as an error.
+func RreadCountZero(b *bytes.Buffer) error {
+	_, _, _, t, err := protocol.UnmarshalTreadPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRreadPkt(b, t, []byte(""))
 	return nil
 }

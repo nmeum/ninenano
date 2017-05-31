@@ -505,6 +505,20 @@ test_9pfs__rread_with_offset(void)
 }
 
 static void
+test_9pfs__rread_count_zero(void)
+{
+	_9pfid f;
+	char dest[11];
+
+	setcmd("rread_count_zero\n");
+
+	f.fid = 42;
+	f.iounit = 1337;
+
+	TEST_ASSERT_EQUAL_INT(-EFBIG, _9pread(&f, dest, 10));
+}
+
+static void
 test_9pfs__rread_with_larger_count(void)
 {
 	_9pfid f;
@@ -554,6 +568,7 @@ tests_9pfs_tests(void)
 
 		new_TestFixture(test_9pfs__rread_success),
 		new_TestFixture(test_9pfs__rread_with_offset),
+		new_TestFixture(test_9pfs__rread_count_zero),
 		new_TestFixture(test_9pfs__rread_with_larger_count),
 	};
 
