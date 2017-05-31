@@ -52,6 +52,8 @@ func handlepc(conn net.Conn) {
 }
 
 func main() {
+	flag.Parse()
+
 	cl, err := net.Listen("tcp", *caddr)
 	if err != nil {
 		panic(err)

@@ -1,5 +1,6 @@
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -15,6 +16,19 @@
 #include "net/sock/tcp.h"
 
 #include "embUnit.h"
+
+/**
+ * Retrieve value of environment variable using getenv(3) and return
+ * `EXIT_FAILURE` if the result was a NULL pointer.
+ *
+ * @param VAR Name of the variable to store result in.
+ * @param ENV Name of the environment variable.
+ */
+#define GETENV(VAR, ENV) \
+	do { if (!(VAR = getenv(ENV))) { \
+		printf("%s is not set or empty\n", ENV); \
+		return EXIT_FAILURE; } \
+	} while (0)
 
 enum {
 	MAXSIZ = 128,
@@ -67,8 +81,13 @@ tests_9pfs_tests(void)
 int
 main(void)
 {
-	remote.port = PORT;
-	ipv6_addr_from_str((ipv6_addr_t *)&remote.addr, "fe80::fcb5:7fff:fe5e:c7e");
+	char *addr, *port;
+
+	GETENV(addr, "NINERIOT_ADDR");
+	GETENV(port, "NINERIOT_PPORT");
+
+	remote.port = atoi(port);
+	ipv6_addr_from_str((ipv6_addr_t *)&remote.addr, addr);
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
@@ -77,5 +96,5 @@ main(void)
 	TESTS_RUN(tests_9pfs_tests());
 	TESTS_END();
 
-	return 0;
+	return EXIT_SUCCESS;
 }

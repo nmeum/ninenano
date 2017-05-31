@@ -13,16 +13,6 @@ RIOTBASE ?= $(CURDIR)/../../../vendor/RIOT
 # CFLAGS for debugging purposes
 CFLAGS += -DDEVELHELP -ggdb
 
-# CFLAGS for configuration purposes
-CFLAGS += -DCPORT=2342 -DPPORT=4223
-
-# CFLAGS for configuring address of test server
-ifeq ($(NINEP_TESTSERVER),)
-  $(error 'NINEP_TESTSERVER' environment variable isn't set)
-else
-  CFLAGS += -DREMOTE_ADDR=\"$(NINEP_TESTSERVER)\"
-endif
-
 # Modules required for using sock_tcp
 USEMODULE += ipv6_addr
 USEMODULE += lwip_ipv6_autoconfig

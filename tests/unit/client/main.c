@@ -1,3 +1,9 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "9pfs.h"
 #include "xtimer.h"
 
@@ -9,6 +15,19 @@
 #include "net/sock/tcp.h"
 
 #include "embUnit.h"
+
+/**
+ * Retrieve value of environment variable using getenv(3) and return
+ * `EXIT_FAILURE` if the result was a NULL pointer.
+ *
+ * @param VAR Name of the variable to store result in.
+ * @param ENV Name of the environment variable.
+ */
+#define GETENV(VAR, ENV) \
+	do { if (!(VAR = getenv(ENV))) { \
+		printf("%s is not set or empty\n", ENV); \
+		return EXIT_FAILURE; } \
+	} while (0)
 
 /**
  * TCP control socket
@@ -547,17 +566,22 @@ tests_9pfs_tests(void)
 int
 main(void)
 {
+	char *addr, *cport, *pport;
 	static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
 	static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
 
-	pr.port = PPORT;
-	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, REMOTE_ADDR);
+	GETENV(addr, "NINERIOT_ADDR");
+	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, addr);
+	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, addr);
 
-	cr.port = CPORT;
-	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, REMOTE_ADDR);
+	GETENV(pport, "NINERIOT_PPORT");
+	GETENV(cport, "NINERIOT_CPORT");
+
+	pr.port = atoi(pport);
+	cr.port = atoi(cport);
 
 	if (sock_tcp_connect(&csock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0) {
 		puts("Couldn't connect to control server");
@@ -577,5 +601,5 @@ main(void)
 	sock_tcp_disconnect(&csock);
 	_9pclose();
 
-	return 0;
+	return EXIT_SUCCESS;
 }
