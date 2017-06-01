@@ -38,6 +38,8 @@ var ctlcmds = map[string]ServerReply{
 	"rread_success":     {RreadSuccess, protocol.Tread},
 	"rread_with_offset": {RreadWithOffset, protocol.Tread},
 	"rread_count_zero":  {RreadCountZero, protocol.Tread},
+
+	"rclunk_success": {RclunkSuccess, protocol.Tclunk},
 }
 
 // Replies with a single byte. This is thus even shorter than the four-byte
@@ -453,5 +455,17 @@ func RreadCountZero(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRreadPkt(b, t, []byte(""))
+	return nil
+}
+
+// Replies with a valid Rclunk message. The client must be able to parse
+// this.
+func RclunkSuccess(b *bytes.Buffer) error {
+	_, t, err := protocol.UnmarshalTclunkPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRclunkPkt(b, t)
 	return nil
 }

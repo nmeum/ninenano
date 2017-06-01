@@ -533,6 +533,30 @@ test_9pfs__rread_with_larger_count(void)
 	TEST_ASSERT_EQUAL_STRING("Hello!", (char*)dest);
 }
 
+static void
+test_9pfs__rclunk_success(void)
+{
+	_9pfid *f;
+
+	setcmd("rclunk_success\n");
+
+	f = _fidtbl(23, ADD);
+	f->fid = 23;
+
+	TEST_ASSERT_EQUAL_INT(0, _9pclunk(f));
+}
+
+static void
+test_9pfs__rclunk_bad_fid(void)
+{
+	_9pfid f;
+
+	setcmd("rclunk_success\n");
+
+	f.fid = 42;
+	TEST_ASSERT_EQUAL_INT(-EBADF, _9pclunk(&f));
+}
+
 Test*
 tests_9pfs_tests(void)
 {
@@ -568,6 +592,9 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__rread_with_offset),
 		new_TestFixture(test_9pfs__rread_count_zero),
 		new_TestFixture(test_9pfs__rread_with_larger_count),
+
+		new_TestFixture(test_9pfs__rclunk_success),
+		new_TestFixture(test_9pfs__rclunk_bad_fid),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);

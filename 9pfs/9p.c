@@ -365,6 +365,52 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
 }
 
 /**
+ * From clunk(5):
+ *   The clunk request informs the file server that the current file
+ *   represented by fid is no longer needed by the client. The actual
+ *   file is not removed on the server unless the fid had been opened
+ *   with ORCLOSE.
+ *
+ * This function also takes care of removing the given fid from the
+ * fid table. It therefore frees all resources associated with the given
+ * fid on both the client and the server.
+ *
+ * @param f Pointer to a fid which should be closed.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+int
+_9pclunk(_9pfid *f)
+{
+	int r;
+	uint8_t *bufpos;
+	_9ppkt pkt;
+
+	bufpos = pkt.buf = buffer;
+
+	/* From intro(5):
+	 *   size[4] Tclunk tag[2] fid[4]
+	 */
+	pkt.type = Tclunk;
+	bufpos = _htop32(bufpos, f->fid);
+
+	pkt.len = bufpos - pkt.buf;
+	if ((r = _do9p(&pkt)))
+		return r;
+
+	/* From intro(5):
+	 *   size[4] Rclunk tag[2]
+	 *
+	 * These first seven bytes are already parsed by _do9p.
+	 * Therefore we don't need to parse anything here.
+	 */
+
+	if (!_fidtbl(f->fid, DEL))
+		return -EBADF;
+
+	return 0;
+}
+
+/**
  * From intro(5):
  *   The stat transaction retrieves information about the file. The stat
  *   field in the reply includes the file's name, access permissions
@@ -612,7 +658,7 @@ _9popen(_9pfid *f, int fl)
 }
 
 /**
- * From intro(5):
+ * From read(5):
  *   The read request asks for count bytes of data from the file
  *   identified by fid, which must be opened for reading, start-
  *   ing offset bytes after the beginning of the file.

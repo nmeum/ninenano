@@ -66,6 +66,8 @@ test_9pfs__read_file(void)
 
 	dest[n] = '\0';
 	TEST_ASSERT_EQUAL_STRING("Hello World!\n", (char*)dest);
+
+	TEST_ASSERT_EQUAL_INT(0, _9pclunk(fid));
 }
 
 Test*
