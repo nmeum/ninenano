@@ -115,6 +115,7 @@ static int
 _9pheader(_9ppkt *pkt, uint32_t buflen)
 {
 	uint8_t type;
+	uint32_t len;
 
 	pkt->buf = buffer;
 
@@ -125,11 +126,12 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 	 */
 	if (buflen < BIT32SZ)
 		return -EBADMSG;
-	_ptoh32(&pkt->len, pkt);
+	_ptoh32(&len, pkt);
 
-	DEBUG("Length of the 9P message: %d\n", pkt->len);
-	if (pkt->len > buflen || pkt->len < _9P_HEADSIZ)
+	DEBUG("Length of the 9P message: %zu\n", len);
+	if (len > buflen || len < _9P_HEADSIZ)
 		return -EBADMSG;
+	pkt->len = len - BIT32SZ;
 
 	/* From intro(5):
 	 *   The next byte is the message type, one of the constants in
@@ -198,13 +200,13 @@ _do9p(_9ppkt *p)
 			p->buf, p->len)) < 0)
 		return ret;
 
-	DEBUG("Reading from server...\n");
-	if ((ret = sock_tcp_read(&sock, buffer, msize, _9P_TIMOUT)) < 0)
-		return ret;
-
 	/* Tag and type will be overwritten by _9pheader. */
 	ttype = p->type;
 	ttag = p->tag;
+
+	DEBUG("Reading from server...\n");
+	if ((ret = sock_tcp_read(&sock, buffer, msize, _9P_TIMOUT)) < 0)
+		return ret;
 
 	/* Maximum length of a 9P message is 2^32. */
 	if ((unsigned)ret > UINT32_MAX) /* ret is >= 0 at this point. */
