@@ -339,6 +339,7 @@ void _9pclose(void);
 
 int _9pversion(void);
 int _9pattach(_9pfid**, char*, char*);
+int _9pclunk(_9pfid*);
 int _9pstat(_9pfid*, struct stat*);
 int _9pwalk(_9pfid**, char*);
 int _9popen(_9pfid*, int);

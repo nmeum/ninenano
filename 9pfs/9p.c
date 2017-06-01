@@ -384,7 +384,6 @@ _9pstat(_9pfid *fid, struct stat *b)
 	int r;
 	uint8_t *bufpos;
 	uint32_t mode;
-	uint16_t nstat;
 	_9ppkt pkt;
 
 	bufpos = pkt.buf = buffer;
@@ -407,21 +406,8 @@ _9pstat(_9pfid *fid, struct stat *b)
 	if (pkt.len < _9P_STATSIZ)
 		return -EBADMSG;
 
-	/* From intro(5):
-	 *   The notation parameter[n] where n is not a constant
-	 *   represents a variable-length parameter: n[2] followed by n
-	 *   bytes of data forming the parameter.
-	 *
-	 * The nstat value should be equal to pkt.len at this point.
-	 */
-	_ptoh16(&nstat, &pkt);
-
-	DEBUG("nstat: %d\n", nstat);
-	if (nstat != pkt.len)
-		return -EBADMSG;
-
 	/* Skip: n[2], size[2], type[2] and dev[4]. */
-	ADVBUF(&pkt, 2 * BIT16SZ + BIT32SZ);
+	ADVBUF(&pkt, 3 * BIT16SZ + BIT32SZ);
 
 	/* store qid informations in given fid. */
 	if (_hqid(&fid->qid, &pkt))

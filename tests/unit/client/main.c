@@ -403,16 +403,6 @@ test_9pfs__rstat_success(void)
 }
 
 static void
-test_9pfs__nstat_invalid(void)
-{
-	_9pfid f;
-	struct stat st;
-
-	setcmd("rstat_nstat_invalid\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pstat(&f, &st));
-}
-
-static void
 test_9pfs__rwalk_success(void)
 {
 	_9pfid *f;
@@ -566,7 +556,6 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__rattach_invalid_len),
 
 		new_TestFixture(test_9pfs__rstat_success),
-		new_TestFixture(test_9pfs__nstat_invalid),
 
 		new_TestFixture(test_9pfs__rwalk_success),
 		new_TestFixture(test_9pfs__rwalk_invalid_len),

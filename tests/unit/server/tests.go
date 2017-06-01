@@ -27,8 +27,7 @@ var ctlcmds = map[string]ServerReply{
 	"rattach_success":     {RattachSuccess, protocol.Tattach},
 	"rattach_invalid_len": {RattachInvalidLength, protocol.Tattach},
 
-	"rstat_success":       {RstatSuccess, protocol.Tstat},
-	"rstat_nstat_invalid": {RstatNstatInvalid, protocol.Tstat},
+	"rstat_success": {RstatSuccess, protocol.Tstat},
 
 	"rwalk_success":         {RwalkSuccess, protocol.Twalk},
 	"rwalk_invalid_len":     {RwalkInvalidLen, protocol.Twalk},
@@ -315,41 +314,6 @@ func RstatSuccess(b *bytes.Buffer) error {
 	protocol.Marshaldir(&B, dir)
 
 	protocol.MarshalRstatPkt(b, t, B.Bytes())
-	return nil
-}
-
-// Replies with a stat message containing an invalid two-byte nstat
-// field which would cause the message to be longer than indicated in
-// the size field.
-func RstatNstatInvalid(b *bytes.Buffer) error {
-	_, t, err := protocol.UnmarshalTstatPkt(b)
-	if err != nil {
-		return err
-	}
-
-	var B bytes.Buffer
-	var D protocol.Dir
-
-	protocol.Marshaldir(&B, D)
-
-	var l uint64
-	var n uint16 = uint16(1337)
-
-	b.Reset()
-	b.Write([]byte{0, 0, 0, 0,
-		uint8(protocol.Rstat),
-		byte(t), byte(t >> 8),
-		uint8(n >> 0),
-		uint8(n >> 8),
-	})
-
-	b.Write(B.Bytes())
-
-	{
-		l = uint64(b.Len())
-		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
-	}
-
 	return nil
 }
 
