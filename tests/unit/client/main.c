@@ -472,6 +472,7 @@ static void
 test_9pfs__rread_success(void)
 {
 	_9pfid f;
+	ssize_t ret;
 	char dest[7];
 
 	setcmd("rread_success\n");
@@ -479,8 +480,10 @@ test_9pfs__rread_success(void)
 	f.fid = 42;
 	f.iounit = 50;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 6));
-	dest[6] = '\0';
+	ret = _9pread(&f, dest, 6);
+	TEST_ASSERT_EQUAL_INT(6, ret);
+
+	dest[ret] = '\0';
 	TEST_ASSERT_EQUAL_STRING("Hello!", (char*)dest);
 }
 
@@ -488,6 +491,7 @@ static void
 test_9pfs__rread_with_offset(void)
 {
 	_9pfid f;
+	ssize_t ret;
 	char dest[11];
 
 	// Set command twice because with an iounilt of 5
@@ -499,8 +503,10 @@ test_9pfs__rread_with_offset(void)
 	f.fid = 23;
 	f.iounit = 5;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 10));
-	dest[10] = '\0';
+	ret = _9pread(&f, dest, 10);
+	TEST_ASSERT_EQUAL_INT(10, ret);
+
+	dest[ret] = '\0';
 	TEST_ASSERT_EQUAL_STRING("1234567890", (char*)dest);
 }
 
@@ -522,6 +528,7 @@ static void
 test_9pfs__rread_with_larger_count(void)
 {
 	_9pfid f;
+	ssize_t ret;
 	char dest[7];
 
 	setcmd("rread_success\n");
@@ -529,8 +536,10 @@ test_9pfs__rread_with_larger_count(void)
 	f.fid = 5;
 	f.iounit = 100;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 100));
-	dest[6] = '\0';
+	ret = _9pread(&f, dest, 100);
+	TEST_ASSERT_EQUAL_INT(6, ret);
+
+	dest[ret] = '\0';
 	TEST_ASSERT_EQUAL_STRING("Hello!", (char*)dest);
 }
 

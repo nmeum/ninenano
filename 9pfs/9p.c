@@ -633,9 +633,10 @@ _9popen(_9pfid *f, int fl)
  * @param dest Pointer to a buffer to which the received data should be
  * 	written.
  * @param count Amount of data that should be read.
- * @return `0` on success, on failure a negative errno is returned.
+ * @return The number of bytes read on success or a negative
+ * 	errno on error.
  */
-int
+ssize_t
 _9pread(_9pfid *f, char *dest, size_t count)
 {
 	int r;
@@ -698,5 +699,5 @@ _9pread(_9pfid *f, char *dest, size_t count)
 			break;
 	}
 
-	return 0;
+	return n;
 }

@@ -52,18 +52,19 @@ tear_down(void)
 static void
 test_9pfs__read_file(void)
 {
+	size_t n;
 	_9pfid *rootfid, *fid;
 	char dest[MAXSIZ];
-
-	/* TODO */
-	memset(dest, '\0', MAXSIZ);
 
 	TEST_ASSERT_EQUAL_INT(0, _9pversion());
 	TEST_ASSERT_EQUAL_INT(0, _9pattach(&rootfid, "foo", NULL));
 	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "foo/bar/hello"));
 	TEST_ASSERT_EQUAL_INT(0, _9popen(fid, O_RDONLY));
-	TEST_ASSERT_EQUAL_INT(0, _9pread(fid, dest, MAXSIZ - 1));
 
+	n = _9pread(fid, dest, MAXSIZ - 1);
+	TEST_ASSERT_EQUAL_INT(n, 13);
+
+	dest[n] = '\0';
 	TEST_ASSERT_EQUAL_STRING("Hello World!\n", (char*)dest);
 }
 
