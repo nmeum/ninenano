@@ -22,7 +22,7 @@
  *   receive in a single 9P message.
  */
 #ifndef _9P_MSIZE
-  #define _9P_MSIZE 8192
+  #define _9P_MSIZE 1024
 #endif
 
 /**
@@ -53,7 +53,7 @@
  * be tweaked by defining this macro.
  */
 #ifndef _9P_MAXFIDS
-  #define _9P_MAXFIDS 256
+  #define _9P_MAXFIDS 16
 #endif
 
 /**
