@@ -193,7 +193,7 @@ _do9p(_9ppkt *p)
 	headpos = _htop8(headpos, p->type);
 	headpos = _htop16(headpos, p->tag);
 
-	DEBUG("Sending %d bytes to server...\n", _9P_HEADSIZ + p->len);
+	DEBUG("Sending %zu bytes to server...\n", _9P_HEADSIZ + p->len);
 	if ((ret = sock_tcp_write(&sock, head, _9P_HEADSIZ)) < 0)
 		return ret;
 	if (p->len > 0 && (ret = sock_tcp_write(&sock,
@@ -212,7 +212,7 @@ _do9p(_9ppkt *p)
 	if ((unsigned)ret > UINT32_MAX) /* ret is >= 0 at this point. */
 		return -EBADMSG;
 
-	DEBUG("Read %d bytes from server, parsing them...\n", ret);
+	DEBUG("Read %zu bytes from server, parsing them...\n", ret);
 	if ((ret = _9pheader(p, (uint32_t)ret)))
 		return ret;
 
