@@ -230,6 +230,52 @@ _do9p(_9ppkt *p)
 }
 
 /**
+ * Frees all resources allocated for a given fid on both the client and
+ * the server. Optionally the file associated with the fid can also be
+ * removed from the server.
+ *
+ * @pre t == Tclunk || t == Tremove
+ *
+ * @param f Pointer to fid on which the operation should be performed.
+ * @param t Type of the operation which should be performed.
+ *
+ * @return `0` on success, on error a negative errno is returned.
+ */
+static int
+_fidrem(_9pfid *f, _9ptype t)
+{
+	int r;
+	uint8_t *bufpos;
+	_9ppkt pkt;
+
+	if (t != Tclunk && t != Tremove)
+		return -EINVAL;
+	bufpos = pkt.buf = buffer;
+
+	/* From intro(5):
+	 *   size[4] Tclunk|Tremove tag[2] fid[4]
+	 */
+	pkt.type = t;
+	bufpos = _htop32(bufpos, f->fid);
+
+	pkt.len = bufpos - pkt.buf;
+	if ((r = _do9p(&pkt)))
+		return r;
+
+	/* From intro(5):
+	 *   size[4] Rclunk|Rremove tag[2]
+	 *
+	 * These first seven bytes are already parsed by _do9p.
+	 * Therefore we don't need to parse anything here.
+	 */
+
+	if (!_fidtbl(f->fid, DEL))
+		return -EBADF;
+
+	return 0;
+}
+
+/**
  * From version(5):
  *   The version request negotiates the protocol version and message
  *   size to be used on the connection and initializes the connection
@@ -371,43 +417,13 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
  *   file is not removed on the server unless the fid had been opened
  *   with ORCLOSE.
  *
- * This function also takes care of removing the given fid from the
- * fid table. It therefore frees all resources associated with the given
- * fid on both the client and the server.
- *
  * @param f Pointer to a fid which should be closed.
  * @return `0` on success, on error a negative errno is returned.
  */
-int
+inline int
 _9pclunk(_9pfid *f)
 {
-	int r;
-	uint8_t *bufpos;
-	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
-
-	/* From intro(5):
-	 *   size[4] Tclunk tag[2] fid[4]
-	 */
-	pkt.type = Tclunk;
-	bufpos = _htop32(bufpos, f->fid);
-
-	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
-		return r;
-
-	/* From intro(5):
-	 *   size[4] Rclunk tag[2]
-	 *
-	 * These first seven bytes are already parsed by _do9p.
-	 * Therefore we don't need to parse anything here.
-	 */
-
-	if (!_fidtbl(f->fid, DEL))
-		return -EBADF;
-
-	return 0;
+	return _fidrem(f, Tclunk);
 }
 
 /**
@@ -734,4 +750,18 @@ _9pread(_9pfid *f, char *dest, size_t count)
 	}
 
 	return n;
+}
+
+/**
+ * From remove(5):
+ *   The remove request asks the file server both to remove the file
+ *   represented by fid and to clunk the fid, even if the remove fails.
+ *
+ * @param f Pointer to the fid which should be removed.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+inline int
+_9premove(_9pfid *f)
+{
+	return _fidrem(f, Tremove);
 }

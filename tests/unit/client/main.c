@@ -557,6 +557,30 @@ test_9pfs__rclunk_bad_fid(void)
 	TEST_ASSERT_EQUAL_INT(-EBADF, _9pclunk(&f));
 }
 
+static void
+test_9pfs__rremove_success(void)
+{
+	_9pfid *f;
+
+	setcmd("remove_success\n");
+
+	f = _fidtbl(9, ADD);
+	f->fid = 9;
+
+	TEST_ASSERT_EQUAL_INT(0, _9premove(f));
+}
+
+static void
+test_9pfs__rremove_bad_fid(void)
+{
+	_9pfid f;
+
+	setcmd("remove_success\n");
+
+	f.fid = 5;
+	TEST_ASSERT_EQUAL_INT(-EBADF, _9premove(&f));
+}
+
 Test*
 tests_9pfs_tests(void)
 {
@@ -595,6 +619,9 @@ tests_9pfs_tests(void)
 
 		new_TestFixture(test_9pfs__rclunk_success),
 		new_TestFixture(test_9pfs__rclunk_bad_fid),
+
+		new_TestFixture(test_9pfs__rremove_success),
+		new_TestFixture(test_9pfs__rremove_bad_fid),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);

@@ -344,6 +344,7 @@ int _9pstat(_9pfid*, struct stat*);
 int _9pwalk(_9pfid**, char*);
 int _9popen(_9pfid*, int);
 int _9pread(_9pfid*, char*, size_t);
+int _9premove(_9pfid*);
 
 _9pfid* _fidtbl(uint32_t, _9pfidop);
 _9pfid* newfid(void);

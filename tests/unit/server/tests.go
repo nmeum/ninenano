@@ -40,6 +40,8 @@ var ctlcmds = map[string]ServerReply{
 	"rread_count_zero":  {RreadCountZero, protocol.Tread},
 
 	"rclunk_success": {RclunkSuccess, protocol.Tclunk},
+
+	"remove_success": {RremoveSuccess, protocol.Tremove},
 }
 
 // Replies with a single byte. This is thus even shorter than the four-byte
@@ -467,5 +469,17 @@ func RclunkSuccess(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRclunkPkt(b, t)
+	return nil
+}
+
+// Replies with a valid Rremove message. The cient must be able to parse
+// this.
+func RremoveSuccess(b *bytes.Buffer) error {
+	_, t, err := protocol.UnmarshalTremovePkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRremovePkt(b, t)
 	return nil
 }
