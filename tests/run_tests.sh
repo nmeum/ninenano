@@ -29,8 +29,8 @@ if [ $# -ne 1 ]; then
 fi
 
 export NINERIOT_ADDR="${1}"
-export NINERIOT_CPORT="${NINERIOT_CPORT:-1337}"
-export NINERIOT_PPORT="${NINERIOT_PPORT:-5542}"
+export NINERIOT_CPORT="${NINERIOT_CPORT:-1338}"
+export NINERIOT_PPORT="${NINERIOT_PPORT:-5543}"
 
 testsuite unit \
 	-ca ":${NINERIOT_CPORT}" \

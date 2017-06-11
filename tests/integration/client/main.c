@@ -30,17 +30,31 @@
 		return EXIT_FAILURE; } \
 	} while (0)
 
+/**
+ * Various global variables.
+ */
 enum {
-	MAXSIZ = 128,
+	MAXSIZ = 128, /**< Maximum size of buffers located on the stack. */
 };
 
+/**
+ * Endpoint for the protocol socket.
+ */
 static sock_tcp_ep_t remote = SOCK_IPV6_EP_ANY;
+
+/**
+ * Rootfid newly initialized for each test.
+ */
+static _9pfid *rootfid;
 
 static void
 set_up(void)
 {
 	if (_9pinit(remote))
 		TEST_FAIL("_9pinit failed");
+
+	TEST_ASSERT_EQUAL_INT(0, _9pversion());
+	TEST_ASSERT_EQUAL_INT(0, _9pattach(&rootfid, "test", NULL));
 }
 
 static void
@@ -50,14 +64,12 @@ tear_down(void)
 }
 
 static void
-test_9pfs__read_file(void)
+test_9pfs__read(void)
 {
 	size_t n;
-	_9pfid *rootfid, *fid;
+	_9pfid *fid;
 	char dest[MAXSIZ];
 
-	TEST_ASSERT_EQUAL_INT(0, _9pversion());
-	TEST_ASSERT_EQUAL_INT(0, _9pattach(&rootfid, "foo", NULL));
 	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "foo/bar/hello"));
 	TEST_ASSERT_EQUAL_INT(0, _9popen(fid, OREAD));
 
@@ -70,11 +82,24 @@ test_9pfs__read_file(void)
 	TEST_ASSERT_EQUAL_INT(0, _9pclunk(fid));
 }
 
+static void
+test_9pfs_create_and_delete(void)
+{
+	_9pfid *fid;
+
+	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "foo"));
+	TEST_ASSERT_EQUAL_INT(0, _9pcreate(fid, "falafel", ORDWR, OTRUNC));
+
+	TEST_ASSERT_EQUAL_INT(0, _9premove(fid));
+	TEST_ASSERT(_9pwalk(&fid, "foo/falafel") != 0); /* TODO better check. */
+}
+
 Test*
 tests_9pfs_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
-		new_TestFixture(test_9pfs__read_file),
+		new_TestFixture(test_9pfs__read),
+		new_TestFixture(test_9pfs_create_and_delete),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
