@@ -39,7 +39,7 @@ Refactor existing code:
 
 Implement missing message types:
 
-* [ ] Tcreate
+* [x] Tcreate
 * [ ] Twrite
 * [ ] Twstat
 

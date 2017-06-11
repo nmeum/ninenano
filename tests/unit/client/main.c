@@ -461,6 +461,18 @@ test_9pfs__ropen_success(void)
 }
 
 static void
+test_9pfs__rcreate_success(void)
+{
+	_9pfid f;
+
+	f.fid = 4223;
+
+	setcmd("rcreate_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9pcreate(&f, "hurrdurr", ORDWR, 0));
+	TEST_ASSERT_EQUAL_INT(9001, f.iounit);
+}
+
+static void
 test_9pfs__rread_success(void)
 {
 	_9pfid f;
@@ -486,7 +498,7 @@ test_9pfs__rread_with_offset(void)
 	ssize_t ret;
 	char dest[11];
 
-	// Set command twice because with an iounilt of 5
+	// Set command twice because with an iounit of 5
 	// we need to send two requests to receive the
 	// entire file.
 	setcmd("rread_with_offset\n");
@@ -613,6 +625,8 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__rwalk_nwqid_too_large),
 
 		new_TestFixture(test_9pfs__ropen_success),
+
+		new_TestFixture(test_9pfs__rcreate_success),
 
 		new_TestFixture(test_9pfs__rread_success),
 		new_TestFixture(test_9pfs__rread_with_offset),

@@ -276,6 +276,34 @@ _fidrem(_9pfid *f, _9ptype t)
 }
 
 /**
+ * Parses the body of a 9P Ropen or Rcreate message. The body of those
+ * two messages consists of a qid and an iounit. The values of both
+ * fields are stored in the given fid.
+ *
+ * @param f Pointer to the fid associated with the new file.
+ * @param pkt Pointer to the packet from which the body should be read.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+static int
+_newfile(_9pfid *f, _9ppkt *pkt)
+{
+	if (_hqid(&f->qid, pkt) || pkt->len < BIT32SZ)
+		return -EBADMSG;
+	_ptoh32(&f->iounit, pkt);
+
+	/* From open(5):
+	 *   The iounit field returned by open and create may be zero.
+	 *   If it is not, it is the maximum number of bytes that are
+	 *   guaranteed to be read from or written to the file without
+	 *   breaking the I/O transfer into multiple 9P messages
+	 */
+	if (!f->iounit)
+		f->iounit = msize - _9P_IOHDRSIZ;
+
+	return 0;
+}
+
+/**
  * From version(5):
  *   The version request negotiates the protocol version and message
  *   size to be used on the connection and initializes the connection
@@ -651,18 +679,56 @@ _9popen(_9pfid *f, int flags)
 	/* From intro(5):
 	 *   size[4] Ropen tag[2] qid[13] iounit[4]
 	 */
-	if (_hqid(&f->qid, &pkt) || pkt.len < BIT32SZ)
-		return -EBADMSG;
-	_ptoh32(&f->iounit, &pkt);
+	if ((r = _newfile(f, &pkt)))
+		return r;
 
-	/* From open(5):
-	 *   The iounit field returned by open and create may be zero.
-	 *   If it is not, it is the maximum number of bytes that are
-	 *   guaranteed to be read from or written to the file without
-	 *   breaking the I/O transfer into multiple 9P messages
+	return 0;
+}
+
+/**
+ * From open(5):
+ *   The create request asks the file server to create a new file with the name
+ *   supplied, in the directory (dir) represented by fid, and requires write
+ *   permission in the directory
+ *
+ * After creation the file will be opened automatically. And the given
+ * fid will no longer represent the directory, instead it now represents
+ * the newly created file.
+ *
+ * @param Pointer to the fid associated with the directory in which a
+ * 	new file should be created.
+ * @param name Name which should be used for the newly created file.
+ * @param perm Permissions with which the new file should be created.
+ * @param flags Flags which should be used for opening the file
+ *   afterwards. See ::_9popen.
+ */
+int
+_9pcreate(_9pfid *f, char *name, int perm, int flags)
+{
+	int r;
+	uint8_t *bufpos;
+	_9ppkt pkt;
+
+	bufpos = pkt.buf = buffer;
+
+	/* From intro(5):
+	 *   size[4] Tcreate tag[2] fid[4] name[s] perm[4] mode[1]
 	 */
-	if (!f->iounit)
-		f->iounit = msize - _9P_IOHDRSIZ;
+	pkt.type = Tcreate;
+	bufpos = _htop32(bufpos, f->fid);
+	bufpos = _pstring(bufpos, name);
+	bufpos = _htop32(bufpos, perm);
+	bufpos = _htop8(bufpos, flags);
+
+	pkt.len = bufpos - pkt.buf;
+	if ((r = _do9p(&pkt)))
+		return r;
+
+	/* From intro(5):
+	 *   size[4] Rcreate tag[2] qid[13] iounit[4]
+	 */
+	if ((r = _newfile(f, &pkt)))
+		return r;
 
 	return 0;
 }

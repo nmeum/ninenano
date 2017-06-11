@@ -35,6 +35,8 @@ var ctlcmds = map[string]ServerReply{
 
 	"ropen_success": {RopenSuccess, protocol.Topen},
 
+	"rcreate_success": {RcreateSuccess, protocol.Tcreate},
+
 	"rread_success":     {RreadSuccess, protocol.Tread},
 	"rread_with_offset": {RreadWithOffset, protocol.Tread},
 	"rread_count_zero":  {RreadCountZero, protocol.Tread},
@@ -406,6 +408,18 @@ func RopenSuccess(b *bytes.Buffer) error {
 	return nil
 }
 
+// Replies with a vaild Rcreate message. The client must be able to
+// parse this.
+func RcreateSuccess(b *bytes.Buffer) error {
+	_, _, _, _, t, err := protocol.UnmarshalTcreatePkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRcreatePkt(b, t, protocol.QID{}, 9001)
+	return nil
+}
+
 // Replies with a valid Rread message. The data field of the message
 // should hold the string `Hello!`. The client must be able to parse
 // this. This function ignores the count sent by the client.
@@ -472,8 +486,8 @@ func RclunkSuccess(b *bytes.Buffer) error {
 	return nil
 }
 
-// Replies with a valid Rremove message. The cient must be able to parse
-// this.
+// Replies with a valid Rremove message. The client must be able to
+// parse this.
 func RremoveSuccess(b *bytes.Buffer) error {
 	_, t, err := protocol.UnmarshalTremovePkt(b)
 	if err != nil {
