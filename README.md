@@ -21,6 +21,9 @@ TODO
 Roadmap
 =======
 
+Refactor existing code:
+
+* [ ] Better error handling (parse Rerror messages)
 * [ ] Simplify `_fibtbl` function
 * [x] Better error codes for _9pattach and _9pwalk
 * [ ] Check string length never exceeds UINT16_MAX
@@ -30,8 +33,15 @@ Roadmap
 * [ ] Only do certian checks when compiled with -DDDEVHELP + assert(3)
 * [ ] Better errno return values to differentiate paths in unit tests
 * [ ] Consider comparison with end pointer to detect buffer overflow in packets
+* [ ] Check that strings passed to _pstring do not exceed UINT16_MAX
+* [ ] 9pfs VFS layer
 * [ ] Refactor Documentation
-* [ ] Implement missing message types
+
+Implement missing message types:
+
+* [ ] Tcreate
+* [ ] Twrite
+* [ ] Twstat
 
 License
 =======
