@@ -116,7 +116,9 @@ test_9putil__hstring_invalid2(void)
 	char dest[5];
 
 	pkt.len = 5;
-	_htop16(buf, 5);
+	pkt.buf = buf;
+
+	_htop16(buf, pkt.len);
 
 	TEST_ASSERT_EQUAL_INT(-1, _hstring(dest, 5, &pkt));
 }
