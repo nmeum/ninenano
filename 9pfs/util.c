@@ -6,6 +6,24 @@
 extern _9pfid fids[_9P_MAXFIDS];
 
 /**
+ * From intro(5):
+ *   Each message consists of a sequence of bytes. Two-, four-, and
+ *   eight-byte fields hold unsigned integers represented in
+ *   little-endian order (least significant byte first).
+ *
+ * Since we want to write an endian-agnostic implementation we define a
+ * macro called `_9p_swap` which is similar to `_byteorder_swap` but
+ * doesn't swap the byte order on little endian plattforms.
+ */
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#   define _9p_swap(V, T) (V)
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#   define _9p_swap(V, T) (byteorder_swap##T((V)))
+#else
+#   error "Byte order is neither little nor big!"
+#endif
+
+/**
  * Advances the position in the packet buffer. The macro takes care of
  * decrementing the length field of the packet as well.
  *
@@ -19,6 +37,12 @@ advbuf(_9ppkt *pkt, size_t off)
 	pkt->buf += off;
 	pkt->len -= off;
 }
+
+/**
+ * @defgroup Functions for the fid table.
+ *
+ * @{
+ */
 
 /**
  * This function can be used to add, get and delete fids. It has one
@@ -95,23 +119,7 @@ newfid(void)
 	return NULL;
 }
 
-/**
- * From intro(5):
- *   Each message consists of a sequence of bytes. Two-, four-, and
- *   eight-byte fields hold unsigned integers represented in
- *   little-endian order (least significant byte first).
- *
- * Since we want to write an endian-agnostic implementation we define a
- * macro called `_9p_swap` which is similar to `_byteorder_swap` but
- * doesn't swap the byte order on little endian plattforms.
- */
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#   define _9p_swap(V, T) (V)
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#   define _9p_swap(V, T) (byteorder_swap##T((V)))
-#else
-#   error "Byte order is neither little nor big!"
-#endif
+/**@}*/
 
 /**
  * @defgroup Functions for converting from host byte order to the byte \
