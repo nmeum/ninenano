@@ -6,6 +6,21 @@
 extern _9pfid fids[_9P_MAXFIDS];
 
 /**
+ * Advances the position in the packet buffer. The macro takes care of
+ * decrementing the length field of the packet as well.
+ *
+ * @param pkt Pointer to a packet in which the buffer position should be
+ * 	advanced.
+ * @param off Offset which should be added to the buffer position.
+ */
+void
+advbuf(_9ppkt *pkt, size_t off)
+{
+	pkt->buf += off;
+	pkt->len -= off;
+}
+
+/**
  * This function can be used to add, get and delete fids. It has one
  * unexpected caveat: The add operation does set the `fid` field, it
  * simply returns the next free fid. Thus the callers has to set the
@@ -174,7 +189,7 @@ void
 ptoh8(uint8_t *dest, _9ppkt *pkt)
 {
 	*dest = *pkt->buf;
-	ADVBUF(pkt, BIT8SZ);
+	advbuf(pkt, BIT8SZ);
 }
 
 void
@@ -182,7 +197,7 @@ ptoh16(uint16_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT16SZ);
 	*dest = _9p_swap(*dest, s);
-	ADVBUF(pkt, BIT16SZ);
+	advbuf(pkt, BIT16SZ);
 }
 
 void
@@ -190,7 +205,7 @@ ptoh32(uint32_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT32SZ);
 	*dest = _9p_swap(*dest, l);
-	ADVBUF(pkt, BIT32SZ);
+	advbuf(pkt, BIT32SZ);
 }
 
 void
@@ -198,7 +213,7 @@ ptoh64(uint64_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT64SZ);
 	*dest = _9p_swap(*dest, ll);
-	ADVBUF(pkt, BIT64SZ);
+	advbuf(pkt, BIT64SZ);
 }
 
 /**@}*/

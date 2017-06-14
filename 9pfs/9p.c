@@ -598,7 +598,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 		return -EBADMSG;
 
 	/* Skip: n[2], size[2], type[2] and dev[4]. */
-	ADVBUF(&pkt, 3 * BIT16SZ + BIT32SZ);
+	advbuf(&pkt, 3 * BIT16SZ + BIT32SZ);
 
 	/* store qid informations in given fid. */
 	if (hqid(&fid->qid, &pkt))
@@ -730,7 +730,7 @@ _9pwalk(_9pfid **dest, char *path)
 	}
 
 	/* Retrieve the last qid. */
-	ADVBUF(&pkt, (nwqid - 1) * _9P_QIDSIZ);
+	advbuf(&pkt, (nwqid - 1) * _9P_QIDSIZ);
 	if (hqid(&fid->qid, &pkt)) {
 		r = -EBADMSG;
 		goto err;
