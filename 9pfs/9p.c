@@ -682,7 +682,7 @@ _9pwalk(_9pfid **dest, char *path)
 	pkt.type = Twalk;
 	bufpos = htop32(bufpos, _9P_ROOTFID);
 	bufpos = nwname = htop32(bufpos, fid->fid);
-	bufpos += 2; /* leave space for nwname[2]. */
+	bufpos += BIT16SZ; /* leave space for nwname[2]. */
 
 	/* generate nwname*(wname[s]) */
 	for (n = i = 0; i < len; n++, i += elen + 1) {
