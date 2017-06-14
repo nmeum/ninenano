@@ -844,8 +844,8 @@ _9pcreate(_9pfid *f, char *name, int perm, int flags)
  * @param dest Pointer to a buffer to which the received data should be
  * 	written.
  * @param count Amount of data that should be read.
- * @return The number of bytes read on success or a negative
- * 	errno on error.
+ * @return The number of bytes read on success or a negative errno on
+ * 	error.
  */
 inline ssize_t
 _9pread(_9pfid *f, char *dest, size_t count)
@@ -854,7 +854,17 @@ _9pread(_9pfid *f, char *dest, size_t count)
 }
 
 /**
- * @todo
+ * From intro(5):
+ *   The write request asks that count bytes of data be recorded in the
+ *   file identified by fid, which must be opened for writing, starting
+ *   offset bytes after the beginning of the file.
+ *
+ * @param f Pointer to the fid to which data should be written.
+ * @param src Pointer to a buffer containing the data which should be
+ * 	written to the file.
+ * @param count Amount of bytes which should be written to the file
+ * @return The number of bytes read on success or a negative errno on
+ * 	error.
  */
 ssize_t
 _9pwrite(_9pfid *f, char *src, size_t count)
