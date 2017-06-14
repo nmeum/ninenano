@@ -20,7 +20,7 @@ extern _9pfid fids[_9P_MAXFIDS];
  *   on failure a NULL pointer is returned instead.
  */
 _9pfid*
-_fidtbl(uint32_t fid, _9pfidop op)
+fidtbl(uint32_t fid, _9pfidop op)
 {
 	_9pfid *ret;
 	size_t i, hash;
@@ -66,11 +66,11 @@ newfid(void)
 
 	for (i = 1; i < _9P_MAXFIDS; i++) {
 		fid = random_uint32_range(1, UINT32_MAX);
-		if (_fidtbl(fid, GET))
+		if (fidtbl(fid, GET))
 			continue;
 
-		/* TODO room for optimization don't call _fidtbl twice. */
-		r = _fidtbl(fid, ADD);
+		/* TODO room for optimization don't call fidtbl twice. */
+		r = fidtbl(fid, ADD);
 		assert(r != NULL);
 
 		r->fid = fid;
@@ -115,7 +115,7 @@ newfid(void)
  */
 
 uint8_t*
-_htop8(uint8_t *buf, uint8_t val)
+htop8(uint8_t *buf, uint8_t val)
 {
 	*buf = val;
 	buf += BIT8SZ;
@@ -123,7 +123,7 @@ _htop8(uint8_t *buf, uint8_t val)
 }
 
 uint8_t*
-_htop16(uint8_t *buf, uint16_t val)
+htop16(uint8_t *buf, uint16_t val)
 {
 	val = _9p_swap(val, s);
 	memcpy(buf, &val, BIT16SZ);
@@ -133,7 +133,7 @@ _htop16(uint8_t *buf, uint16_t val)
 }
 
 uint8_t*
-_htop32(uint8_t *buf, uint32_t val)
+htop32(uint8_t *buf, uint32_t val)
 {
 	val = _9p_swap(val, l);
 	memcpy(buf, &val, BIT32SZ);
@@ -143,7 +143,7 @@ _htop32(uint8_t *buf, uint32_t val)
 }
 
 uint8_t*
-_htop64(uint8_t *buf, uint64_t val)
+htop64(uint8_t *buf, uint64_t val)
 {
 	val = _9p_swap(val, ll);
 	memcpy(buf, &val, BIT64SZ);
@@ -171,14 +171,14 @@ _htop64(uint8_t *buf, uint64_t val)
  */
 
 void
-_ptoh8(uint8_t *dest, _9ppkt *pkt)
+ptoh8(uint8_t *dest, _9ppkt *pkt)
 {
 	*dest = *pkt->buf;
 	ADVBUF(pkt, BIT8SZ);
 }
 
 void
-_ptoh16(uint16_t *dest, _9ppkt *pkt)
+ptoh16(uint16_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT16SZ);
 	*dest = _9p_swap(*dest, s);
@@ -186,7 +186,7 @@ _ptoh16(uint16_t *dest, _9ppkt *pkt)
 }
 
 void
-_ptoh32(uint32_t *dest, _9ppkt *pkt)
+ptoh32(uint32_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT32SZ);
 	*dest = _9p_swap(*dest, l);
@@ -194,7 +194,7 @@ _ptoh32(uint32_t *dest, _9ppkt *pkt)
 }
 
 void
-_ptoh64(uint64_t *dest, _9ppkt *pkt)
+ptoh64(uint64_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT64SZ);
 	*dest = _9p_swap(*dest, ll);
@@ -227,7 +227,7 @@ _ptoh64(uint64_t *dest, _9ppkt *pkt)
  *   written string.
  */
 uint8_t*
-_pstring(uint8_t *buf, char *str)
+pstring(uint8_t *buf, char *str)
 {
 	uint16_t len, siz;
 
@@ -239,7 +239,7 @@ _pstring(uint8_t *buf, char *str)
 	}
 
 	len = strlen(str);
-	buf = _htop16(buf, len);
+	buf = htop16(buf, len);
 
 	memcpy(buf, str, len);
 	buf += len;
@@ -272,13 +272,13 @@ _pstring(uint8_t *buf, char *str)
  * @return `-1` on failure.
  */
 int
-_hstring(char *dest, uint16_t n, _9ppkt *pkt)
+hstring(char *dest, uint16_t n, _9ppkt *pkt)
 {
 	uint16_t siz;
 
 	if (pkt->len < BIT16SZ)
 		return -1;
-	_ptoh16(&siz, pkt);
+	ptoh16(&siz, pkt);
 
 	if (pkt->len < siz || siz >= n)
 		return -1;
@@ -314,14 +314,14 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
  * @return `-1` on failure.
  */
 int
-_hqid(_9pqid *dest, _9ppkt *pkt)
+hqid(_9pqid *dest, _9ppkt *pkt)
 {
 	if (pkt->len < _9P_QIDSIZ)
 		return -1;
 
-	_ptoh8(&dest->type, pkt);
-	_ptoh32(&dest->vers, pkt);
-	_ptoh64(&dest->path, pkt);
+	ptoh8(&dest->type, pkt);
+	ptoh32(&dest->vers, pkt);
+	ptoh64(&dest->path, pkt);
 
 	return 0;
 }

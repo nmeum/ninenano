@@ -51,10 +51,10 @@ static uint32_t msize = _9P_MSIZE;
 /**
  * As with file descriptors, we need to store currently open fids
  * somehow. This is done in this static buffer. This buffer should only
- * be accessed using the ::_fidtbl function it should never be modified
+ * be accessed using the ::fidtbl function it should never be modified
  * directly.
  *
- * This buffer is not static because it is used in the ::_fidtbl
+ * This buffer is not static because it is used in the ::fidtbl
  * function from `util.c`.
  */
 _9pfid fids[_9P_MAXFIDS];
@@ -98,7 +98,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 	 */
 	if (buflen < BIT32SZ)
 		return -EBADMSG;
-	_ptoh32(&len, pkt);
+	ptoh32(&len, pkt);
 
 	DEBUG("Length of the 9P message: %zu\n", len);
 	if (len > buflen || len < _9P_HEADSIZ)
@@ -109,7 +109,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 	 *   The next byte is the message type, one of the constants in
 	 *   the enumeration in the include file <fcall.h>.
 	 */
-	_ptoh8(&type, pkt);
+	ptoh8(&type, pkt);
 
 	DEBUG("Type of 9P message: %d\n", type);
 	if (type < Tversion || type >= Tmax)
@@ -121,7 +121,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 	/* From intro(5):
 	 *   The next two bytes are an identifying tag, described below.
 	 */
-	_ptoh16(&pkt->tag, pkt);
+	ptoh16(&pkt->tag, pkt);
 	DEBUG("Tag of 9P message: %d\n", pkt->tag);
 
 	return 0;
@@ -143,7 +143,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
  * @return `0` on success, on error a negative errno is returned.
  */
 static int
-_do9p(_9ppkt *p)
+do9p(_9ppkt *p)
 {
 	ssize_t ret;
 	_9ptype ttype;
@@ -161,9 +161,9 @@ _do9p(_9ppkt *p)
 
 	/* Build the "header", meaning: size[4] type[1] tag[2]
 	 * Every 9P message needs those first 7 bytes. */
-	headpos = _htop32(headpos, p->len + _9P_HEADSIZ);
-	headpos = _htop8(headpos, p->type);
-	headpos = _htop16(headpos, p->tag);
+	headpos = htop32(headpos, p->len + _9P_HEADSIZ);
+	headpos = htop8(headpos, p->type);
+	headpos = htop16(headpos, p->tag);
 
 	DEBUG("Sending %zu bytes to server...\n", _9P_HEADSIZ + p->len);
 	if ((ret = sock_tcp_write(&sock, head, _9P_HEADSIZ)) < 0)
@@ -214,7 +214,7 @@ _do9p(_9ppkt *p)
  * @return `0` on success, on error a negative errno is returned.
  */
 static int
-_fidrem(_9pfid *f, _9ptype t)
+fidrem(_9pfid *f, _9ptype t)
 {
 	int r;
 	uint8_t *bufpos;
@@ -228,20 +228,20 @@ _fidrem(_9pfid *f, _9ptype t)
 	 *   size[4] Tclunk|Tremove tag[2] fid[4]
 	 */
 	pkt.type = t;
-	bufpos = _htop32(bufpos, f->fid);
+	bufpos = htop32(bufpos, f->fid);
 
 	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return r;
 
 	/* From intro(5):
 	 *   size[4] Rclunk|Rremove tag[2]
 	 *
-	 * These first seven bytes are already parsed by _do9p.
+	 * These first seven bytes are already parsed by do9p.
 	 * Therefore we don't need to parse anything here.
 	 */
 
-	if (!_fidtbl(f->fid, DEL))
+	if (!fidtbl(f->fid, DEL))
 		return -EBADF;
 
 	return 0;
@@ -257,11 +257,11 @@ _fidrem(_9pfid *f, _9ptype t)
  * @return `0` on success, on error a negative errno is returned.
  */
 static int
-_newfile(_9pfid *f, _9ppkt *pkt)
+newfile(_9pfid *f, _9ppkt *pkt)
 {
-	if (_hqid(&f->qid, pkt) || pkt->len < BIT32SZ)
+	if (hqid(&f->qid, pkt) || pkt->len < BIT32SZ)
 		return -EBADMSG;
-	_ptoh32(&f->iounit, pkt);
+	ptoh32(&f->iounit, pkt);
 
 	/* From open(5):
 	 *   The iounit field returned by open and create may be zero.
@@ -292,7 +292,7 @@ _newfile(_9pfid *f, _9ppkt *pkt)
  * @param t Type of the operation which should be performed.
  */
 static int
-_ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
+ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 {
 	int r;
 	size_t n;
@@ -314,8 +314,8 @@ _ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		 *   size[4] Twrite tag[2] fid[4] offset[8] count[4] data[count]
 		 */
 		pkt.type = t;
-		bufpos = _htop32(bufpos, f->fid);
-		bufpos = _htop64(bufpos, n);
+		bufpos = htop32(bufpos, f->fid);
+		bufpos = htop64(bufpos, n);
 
 		if (count - n <= UINT32_MAX)
 			pcnt = count - n;
@@ -324,7 +324,7 @@ _ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 
 		if (pcnt > f->iounit)
 			pcnt = f->iounit;
-		bufpos = _htop32(bufpos, pcnt);
+		bufpos = htop32(bufpos, pcnt);
 
 		if (t == Twrite) {
 			memcpy(bufpos, &buf[n], pcnt);
@@ -332,7 +332,7 @@ _ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		}
 
 		pkt.len = bufpos - pkt.buf;
-		if ((r = _do9p(&pkt)))
+		if ((r = do9p(&pkt)))
 			return r;
 
 		/* From intro(5):
@@ -342,7 +342,7 @@ _ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		ocnt = pcnt;
 		if (pkt.len < BIT32SZ)
 			return -EBADMSG;
-		_ptoh32(&pcnt, &pkt);
+		ptoh32(&pcnt, &pkt);
 
 		/* From open(5):
 		 *   If the offset field is greater than or equal to the
@@ -437,11 +437,11 @@ _9pversion(void)
 	 *   size[4] Tversion tag[2] msize[4] version[s]
 	 */
 	pkt.type = Tversion;
-	bufpos = _htop32(bufpos, _9P_MSIZE);
-	bufpos = _pstring(bufpos, _9P_VERSION);
+	bufpos = htop32(bufpos, _9P_MSIZE);
+	bufpos = pstring(bufpos, _9P_VERSION);
 
 	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return r;
 
 	/* From intro(5):
@@ -454,7 +454,7 @@ _9pversion(void)
 	 */
 	if (pkt.len <= 10)
 		return -EBADMSG;
-	_ptoh32(&msize, &pkt);
+	ptoh32(&msize, &pkt);
 
 	DEBUG("Msize of Rversion message: %d\n", msize);
 
@@ -472,7 +472,7 @@ _9pversion(void)
 	 *  string, it should respond with an Rversion message (not
 	 *  Rerror) with the version string the 7 characters `unknown`.
          */
-	if (_hstring(ver, _9P_VERLEN, &pkt))
+	if (hstring(ver, _9P_VERLEN, &pkt))
 		return -EBADMSG;
 
 	DEBUG("Version string reported by server: %s\n", ver);
@@ -512,23 +512,23 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
 	 *   size[4] Tattach tag[2] fid[4] afid[4] uname[s] aname[s]
 	 */
 	pkt.type = Tattach;
-	bufpos = _htop32(bufpos, _9P_ROOTFID);
-	bufpos = _htop32(bufpos, _9P_NOFID);
-	bufpos = _pstring(bufpos, uname);
-	bufpos = _pstring(bufpos, aname);
+	bufpos = htop32(bufpos, _9P_ROOTFID);
+	bufpos = htop32(bufpos, _9P_NOFID);
+	bufpos = pstring(bufpos, uname);
+	bufpos = pstring(bufpos, aname);
 
 	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return r;
 
 	/* From intro(5):
 	 *   size[4] Rattach tag[2] qid[13]
 	 */
-	if (!(fid = _fidtbl(_9P_ROOTFID, ADD)))
+	if (!(fid = fidtbl(_9P_ROOTFID, ADD)))
 		return -ENFILE;
 	fid->fid = _9P_ROOTFID;
 
-	if (_hqid(&fid->qid, &pkt)) {
+	if (hqid(&fid->qid, &pkt)) {
 		fid->fid = 0; /* mark fid as free. */
 		return -EBADMSG;
 	}
@@ -552,7 +552,7 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
 inline int
 _9pclunk(_9pfid *f)
 {
-	return _fidrem(f, Tclunk);
+	return fidrem(f, Tclunk);
 }
 
 /**
@@ -583,10 +583,10 @@ _9pstat(_9pfid *fid, struct stat *b)
 	 *   size[4] Tstat tag[2] fid[4]
 	 */
 	pkt.type = Tstat;
-	bufpos = _htop32(bufpos, fid->fid);
+	bufpos = htop32(bufpos, fid->fid);
 
 	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return -1;
 
 	/* From intro(5):
@@ -601,16 +601,16 @@ _9pstat(_9pfid *fid, struct stat *b)
 	ADVBUF(&pkt, 3 * BIT16SZ + BIT32SZ);
 
 	/* store qid informations in given fid. */
-	if (_hqid(&fid->qid, &pkt))
+	if (hqid(&fid->qid, &pkt))
 		return -EBADMSG;
 
 	/* store the other information in the stat struct. */
-	_ptoh32(&mode, &pkt);
+	ptoh32(&mode, &pkt);
 	b->st_mode = (mode & DMDIR) ? S_IFDIR : S_IFREG;
-	_ptoh32((uint32_t*)&b->st_atime, &pkt);
-	_ptoh32((uint32_t*)&b->st_mtime, &pkt);
+	ptoh32((uint32_t*)&b->st_atime, &pkt);
+	ptoh32((uint32_t*)&b->st_mtime, &pkt);
 	b->st_ctime = b->st_mtime;
-	_ptoh64((uint64_t*)&b->st_size, &pkt);
+	ptoh64((uint64_t*)&b->st_size, &pkt);
 
 	/* information for stat struct we cannot extract from the reply. */
 	b->st_dev = b->st_ino = b->st_rdev = 0;
@@ -620,7 +620,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 	b->st_blocks = b->st_size / b->st_blksize + 1;
 
 	/* extract the file name and store it in the fid. */
-	if (_hstring(fid->path, _9P_PTHMAX, &pkt))
+	if (hstring(fid->path, _9P_PTHMAX, &pkt))
 		return -EBADMSG;
 
 	/* uid, gid and muid are ignored. */
@@ -680,8 +680,8 @@ _9pwalk(_9pfid **dest, char *path)
 	 *   nwname*(wname[s])
 	 */
 	pkt.type = Twalk;
-	bufpos = _htop32(bufpos, _9P_ROOTFID);
-	bufpos = nwname = _htop32(bufpos, fid->fid);
+	bufpos = htop32(bufpos, _9P_ROOTFID);
+	bufpos = nwname = htop32(bufpos, fid->fid);
 	bufpos += 2; /* leave space for nwname[2]. */
 
 	/* generate nwname*(wname[s]) */
@@ -696,17 +696,17 @@ _9pwalk(_9pfid **dest, char *path)
 			sep = &path[len - 1] + 1; /* XXX */
 		elen = sep - cur;
 
-		/* XXX this is a duplication of the _pstring func. */
-		bufpos = _htop16(bufpos, elen);
+		/* XXX this is a duplication of the pstring func. */
+		bufpos = htop16(bufpos, elen);
 		memcpy(bufpos, cur, elen);
 		bufpos += elen;
 	}
 
 	DEBUG("Constructed Twalk with %d elements\n", n);
-	_htop16(nwname, n); /* nwname[2] */
+	htop16(nwname, n); /* nwname[2] */
 
 	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		goto err;
 
 	/* From intro(5):
@@ -716,7 +716,7 @@ _9pwalk(_9pfid **dest, char *path)
 		r = -EBADMSG;
 		goto err;
 	}
-	_ptoh16(&nwqid, &pkt);
+	ptoh16(&nwqid, &pkt);
 
 	/**
 	 * From walk(5):
@@ -731,7 +731,7 @@ _9pwalk(_9pfid **dest, char *path)
 
 	/* Retrieve the last qid. */
 	ADVBUF(&pkt, (nwqid - 1) * _9P_QIDSIZ);
-	if (_hqid(&fid->qid, &pkt)) {
+	if (hqid(&fid->qid, &pkt)) {
 		r = -EBADMSG;
 		goto err;
 	}
@@ -743,7 +743,7 @@ _9pwalk(_9pfid **dest, char *path)
 	return 0;
 
 err:
-	assert(_fidtbl(fid->fid, DEL) != NULL);
+	assert(fidtbl(fid->fid, DEL) != NULL);
 	return r;
 }
 
@@ -770,17 +770,17 @@ _9popen(_9pfid *f, int flags)
 	 *   size[4] Topen tag[2] fid[4] mode[1]
 	 */
 	pkt.type = Topen;
-	bufpos = _htop32(bufpos, f->fid);
-	bufpos = _htop8(bufpos, flags);
+	bufpos = htop32(bufpos, f->fid);
+	bufpos = htop8(bufpos, flags);
 
 	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return r;
 
 	/* From intro(5):
 	 *   size[4] Ropen tag[2] qid[13] iounit[4]
 	 */
-	if ((r = _newfile(f, &pkt)))
+	if ((r = newfile(f, &pkt)))
 		return r;
 
 	return 0;
@@ -816,19 +816,19 @@ _9pcreate(_9pfid *f, char *name, int perm, int flags)
 	 *   size[4] Tcreate tag[2] fid[4] name[s] perm[4] mode[1]
 	 */
 	pkt.type = Tcreate;
-	bufpos = _htop32(bufpos, f->fid);
-	bufpos = _pstring(bufpos, name);
-	bufpos = _htop32(bufpos, perm);
-	bufpos = _htop8(bufpos, flags);
+	bufpos = htop32(bufpos, f->fid);
+	bufpos = pstring(bufpos, name);
+	bufpos = htop32(bufpos, perm);
+	bufpos = htop8(bufpos, flags);
 
 	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return r;
 
 	/* From intro(5):
 	 *   size[4] Rcreate tag[2] qid[13] iounit[4]
 	 */
-	if ((r = _newfile(f, &pkt)))
+	if ((r = newfile(f, &pkt)))
 		return r;
 
 	return 0;
@@ -850,7 +850,7 @@ _9pcreate(_9pfid *f, char *name, int perm, int flags)
 inline ssize_t
 _9pread(_9pfid *f, char *dest, size_t count)
 {
-	return _ioloop(f, dest, count, Tread);
+	return ioloop(f, dest, count, Tread);
 }
 
 /**
@@ -859,7 +859,7 @@ _9pread(_9pfid *f, char *dest, size_t count)
 ssize_t
 _9pwrite(_9pfid *f, char *src, size_t count)
 {
-	return _ioloop(f, src, count, Twrite);
+	return ioloop(f, src, count, Twrite);
 }
 
 /**
@@ -873,5 +873,5 @@ _9pwrite(_9pfid *f, char *src, size_t count)
 inline int
 _9premove(_9pfid *f)
 {
-	return _fidrem(f, Tremove);
+	return fidrem(f, Tremove);
 }

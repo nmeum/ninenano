@@ -348,21 +348,21 @@ int _9pread(_9pfid*, char*, size_t);
 int _9pwrite(_9pfid*, char*, size_t);
 int _9premove(_9pfid*);
 
-_9pfid* _fidtbl(uint32_t, _9pfidop);
+_9pfid* fidtbl(uint32_t, _9pfidop);
 _9pfid* newfid(void);
 
-uint8_t* _pstring(uint8_t*, char*);
-int _hstring(char*, uint16_t, _9ppkt*);
-int _hqid(_9pqid*, _9ppkt*);
+uint8_t* pstring(uint8_t*, char*);
+int hstring(char*, uint16_t, _9ppkt*);
+int hqid(_9pqid*, _9ppkt*);
 
-uint8_t* _htop8(uint8_t*, uint8_t);
-uint8_t* _htop16(uint8_t*, uint16_t);
-uint8_t* _htop32(uint8_t*, uint32_t);
-uint8_t* _htop64(uint8_t*, uint64_t);
+uint8_t* htop8(uint8_t*, uint8_t);
+uint8_t* htop16(uint8_t*, uint16_t);
+uint8_t* htop32(uint8_t*, uint32_t);
+uint8_t* htop64(uint8_t*, uint64_t);
 
-void _ptoh8(uint8_t *dest, _9ppkt*);
-void _ptoh16(uint16_t *dest, _9ppkt*);
-void _ptoh32(uint32_t *dest, _9ppkt*);
-void _ptoh64(uint64_t *dest, _9ppkt*);
+void ptoh8(uint8_t *dest, _9ppkt*);
+void ptoh16(uint16_t *dest, _9ppkt*);
+void ptoh32(uint32_t *dest, _9ppkt*);
+void ptoh64(uint64_t *dest, _9ppkt*);
 
 #endif
