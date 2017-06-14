@@ -11,7 +11,20 @@ TODO
 Tests
 =====
 
-TODO
+In order to run the tests you need to setup the toolchain for RIOTs
+[native family](1). Besides you need to install go >= 1.5, python 3.X
+and the [pexpect](2) python package.
+
+Besides a tun devices needs to created:
+
+	# ip tuntap add tap0 mode tap
+	# ip addr add fe80::e42a:1aff:feca:10ec dev tap0
+	# ip link set tap0 up
+
+After creating the tun devices you can run the tests:
+
+	$ export TESTADDR="fe80::e42a:1aff:feca:10ec"
+	$ make test
 
 Usage
 =====
@@ -59,3 +72,6 @@ Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public
 License along with this program. If not, see
 <http://www.gnu.org/licenses/>.
+
+[1]: https://github.com/RIOT-OS/RIOT/wiki/Family:-native#toolchains
+[2]: https://pypi.python.org/pypi/pexpect
