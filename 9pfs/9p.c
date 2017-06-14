@@ -60,37 +60,9 @@ static uint32_t msize = _9P_MSIZE;
 _9pfid fids[_9P_MAXFIDS];
 
 /**
- * Initializes the 9P module. Among other things it opens a TCP socket
- * but it does not initiate the connection with the server. This has to
- * be done manually using the ::_9pversion and ::_9pattach functions.
- *
- * @param remote Remote address of the server to connect to.
- * @return `0` on success, on error a negative errno is returned.
+ * @defgroup Static utility functions.
+ * @{
  */
-int
-_9pinit(sock_tcp_ep_t remote)
-{
-	int r;
-
-	random_init(xtimer_now().ticks32);
-
-	DEBUG("Connecting to TCP socket...\n");
-	if ((r = sock_tcp_connect(&sock, &remote, 0, SOCK_FLAGS_REUSE_EP)))
-		return r;
-
-	return 0;
-}
-
-/**
- * Closes an existing 9P connection freeing all resources on the server
- * and the client.
- */
-void
-_9pclose(void)
-{
-	memset(fids, '\0', _9P_MAXFIDS * sizeof(_9pfid));
-	sock_tcp_disconnect(&sock);
-}
 
 /**
  * Parses the header (the first 7 bytes) of a 9P message contained in
@@ -359,7 +331,6 @@ _ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 			bufpos += pcnt;
 		}
 
-		ocnt = pcnt;
 		pkt.len = bufpos - pkt.buf;
 		if ((r = _do9p(&pkt)))
 			return r;
@@ -368,6 +339,7 @@ _ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		 *   size[4] Rread tag[2] count[4] data[count]
 		 *   size[4] Rwrite tag[2] count[4]
 		 */
+		ocnt = pcnt;
 		if (pkt.len < BIT32SZ)
 			return -EBADMSG;
 		_ptoh32(&pcnt, &pkt);
@@ -395,6 +367,41 @@ _ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 	}
 
 	return n;
+}
+
+/**@}*/
+
+/**
+ * Initializes the 9P module. Among other things it opens a TCP socket
+ * but it does not initiate the connection with the server. This has to
+ * be done manually using the ::_9pversion and ::_9pattach functions.
+ *
+ * @param remote Remote address of the server to connect to.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+int
+_9pinit(sock_tcp_ep_t remote)
+{
+	int r;
+
+	random_init(xtimer_now().ticks32);
+
+	DEBUG("Connecting to TCP socket...\n");
+	if ((r = sock_tcp_connect(&sock, &remote, 0, SOCK_FLAGS_REUSE_EP)))
+		return r;
+
+	return 0;
+}
+
+/**
+ * Closes an existing 9P connection freeing all resources on the server
+ * and the client.
+ */
+void
+_9pclose(void)
+{
+	memset(fids, '\0', _9P_MAXFIDS * sizeof(_9pfid));
+	sock_tcp_disconnect(&sock);
 }
 
 /**
