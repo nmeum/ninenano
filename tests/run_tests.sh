@@ -13,6 +13,7 @@ testsuite() {
 
 	(./${name}/server/server $@ 1>"${log}" 2>&1) &
 	pid=$!
+	trap "kill ${pid}" INT
 
 	cd ./${name}/client
 	"${RIOTBASE}"/tests/unittests/tests/01-run.py
@@ -20,6 +21,8 @@ testsuite() {
 	cd ./../..
 
 	kill ${pid}
+	trap - INT
+
 	return ${ret}
 }
 
