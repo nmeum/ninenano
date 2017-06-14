@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -548,6 +549,23 @@ test_9pfs__rread_with_larger_count(void)
 }
 
 static void
+test_9pfs__rwrite_success(void)
+{
+	_9pfid f;
+	char *str = "hurrdurr";
+	size_t l;
+
+	setcmd("rwrite_success\n");
+
+	f.fid = 9002;
+	f.iounit = 50;
+
+	l = strlen(str);
+	TEST_ASSERT_EQUAL_INT(l, _9pwrite(&f, str, l));
+
+}
+
+static void
 test_9pfs__rclunk_success(void)
 {
 	_9pfid *f;
@@ -632,6 +650,8 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__rread_with_offset),
 		new_TestFixture(test_9pfs__rread_count_zero),
 		new_TestFixture(test_9pfs__rread_with_larger_count),
+
+		new_TestFixture(test_9pfs__rwrite_success),
 
 		new_TestFixture(test_9pfs__rclunk_success),
 		new_TestFixture(test_9pfs__rclunk_bad_fid),

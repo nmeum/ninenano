@@ -53,7 +53,7 @@ Refactor existing code:
 Implement missing message types:
 
 * [x] Tcreate
-* [ ] Twrite
+* [x] Twrite
 * [ ] Twstat
 
 License

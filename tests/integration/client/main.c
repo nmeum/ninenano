@@ -94,12 +94,34 @@ test_9pfs_create_and_delete(void)
 	TEST_ASSERT(_9pwalk(&fid, "foo/falafel") != 0); /* TODO better check. */
 }
 
+static void
+test_9pfs__write(void)
+{
+	_9pfid *fid;
+	char *str = "foobar";
+	char dest[7];
+	size_t n;
+
+	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "writeme"));
+	TEST_ASSERT_EQUAL_INT(0, _9popen(fid, ORDWR|OTRUNC));
+
+	n = _9pwrite(fid, str, 6);
+	TEST_ASSERT_EQUAL_INT(6, n);
+
+	n = _9pread(fid, dest, 6);
+	dest[6] = '\0';
+
+	TEST_ASSERT_EQUAL_STRING(str, (char*)dest);
+	TEST_ASSERT_EQUAL_INT(0, _9pclunk(fid));
+}
+
 Test*
 tests_9pfs_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9pfs__read),
 		new_TestFixture(test_9pfs_create_and_delete),
+		new_TestFixture(test_9pfs__write),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);

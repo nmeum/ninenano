@@ -41,6 +41,8 @@ var ctlcmds = map[string]ServerReply{
 	"rread_with_offset": {RreadWithOffset, protocol.Tread},
 	"rread_count_zero":  {RreadCountZero, protocol.Tread},
 
+	"rwrite_success": {RwriteSuccess, protocol.Twrite},
+
 	"rclunk_success": {RclunkSuccess, protocol.Tclunk},
 
 	"remove_success": {RremoveSuccess, protocol.Tremove},
@@ -471,6 +473,18 @@ func RreadCountZero(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRreadPkt(b, t, []byte(""))
+	return nil
+}
+
+// Replies with a valid Rwrite message. The client must be able to parse
+// this.
+func RwriteSuccess(b *bytes.Buffer) error {
+	_, _, Data, t, err := protocol.UnmarshalTwritePkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRwritePkt(b, t, protocol.Count(len(Data)))
 	return nil
 }
 

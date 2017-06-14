@@ -304,6 +304,100 @@ _newfile(_9pfid *f, _9ppkt *pkt)
 }
 
 /**
+ * Only a maximum of bytes can be transfered atomically. If the amonut
+ * of bytes we want to write to a file (or read from it) exceed this
+ * limit we need to send multiple R-messages to the server. This
+ * function takes care of doing this.
+ *
+ * @pre t == Twrite || t == Tread
+ *
+ * @param f Pointer to fid on which a read or write operation should be
+ * 	performed.
+ * @param buf Pointer to a buffer from which data should be written to
+ * 	or written from.
+ * @param count Amount of bytes that should be written or read from the
+ * 	file.
+ * @param t Type of the operation which should be performed.
+ */
+static int
+_ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
+{
+	int r;
+	size_t n;
+	uint32_t pcnt, ocnt;
+	uint8_t *bufpos;
+	_9ppkt pkt;
+
+	if (t != Twrite && t != Tread)
+		return -EINVAL;
+
+	n = 0;
+	while (n < count) {
+		bufpos = pkt.buf = buffer;
+		DEBUG("Sending %s with offset %zu\n",
+			(t == Tread) ? "Tread" : "Twrite", n);
+
+		/* From intro(5):
+		 *   size[4] Tread tag[2] fid[4] offset[8] count[4]
+		 *   size[4] Twrite tag[2] fid[4] offset[8] count[4] data[count]
+		 */
+		pkt.type = t;
+		bufpos = _htop32(bufpos, f->fid);
+		bufpos = _htop64(bufpos, n);
+
+		if (count - n <= UINT32_MAX)
+			pcnt = count - n;
+		else
+			pcnt = UINT32_MAX;
+
+		if (pcnt > f->iounit)
+			pcnt = f->iounit;
+		bufpos = _htop32(bufpos, pcnt);
+
+		if (t == Twrite) {
+			memcpy(bufpos, &buf[n], pcnt);
+			bufpos += pcnt;
+		}
+
+		ocnt = pcnt;
+		pkt.len = bufpos - pkt.buf;
+		if ((r = _do9p(&pkt)))
+			return r;
+
+		/* From intro(5):
+		 *   size[4] Rread tag[2] count[4] data[count]
+		 *   size[4] Rwrite tag[2] count[4]
+		 */
+		if (pkt.len < BIT32SZ)
+			return -EBADMSG;
+		_ptoh32(&pcnt, &pkt);
+
+		/* From open(5):
+		 *   If the offset field is greater than or equal to the
+		 *   number of bytes in the file, a count of zero will
+		 *   be returned.
+		 */
+		if (!pcnt)
+			return -EFBIG;
+
+		if (pcnt > count)
+			return -EBADMSG;
+
+		if (t == Tread) {
+			if (pkt.len < pcnt)
+				return -EBADMSG;
+			memcpy(&buf[n], pkt.buf, pcnt);
+		}
+
+		n += pcnt;
+		if (pcnt < ocnt)
+			break;
+	}
+
+	return n;
+}
+
+/**
  * From version(5):
  *   The version request negotiates the protocol version and message
  *   size to be used on the connection and initializes the connection
@@ -746,70 +840,19 @@ _9pcreate(_9pfid *f, char *name, int perm, int flags)
  * @return The number of bytes read on success or a negative
  * 	errno on error.
  */
-ssize_t
+inline ssize_t
 _9pread(_9pfid *f, char *dest, size_t count)
 {
-	int r;
-	size_t n;
-	uint32_t pcnt, ocnt;
-	uint8_t *bufpos;
-	_9ppkt pkt;
+	return _ioloop(f, dest, count, Tread);
+}
 
-	n = 0;
-	while (n < count) {
-		bufpos = pkt.buf = buffer;
-		DEBUG("Sending Tread with offset %zu\n", n);
-
-		/* From intro(5):
-		 *   size[4] Tread tag[2] fid[4] offset[8] count[4]
-		 */
-		pkt.type = Tread;
-		bufpos = _htop32(bufpos, f->fid);
-		bufpos = _htop64(bufpos, n);
-
-		if (count - n <= UINT32_MAX)
-			pcnt = count - n;
-		else
-			pcnt = UINT32_MAX;
-
-		if (pcnt > f->iounit)
-			pcnt = f->iounit;
-		bufpos = _htop32(bufpos, pcnt);
-
-		ocnt = pcnt;
-		DEBUG("Requesting %zu bytes from the server\n", pcnt);
-
-		pkt.len = bufpos - pkt.buf;
-		if ((r = _do9p(&pkt)))
-			return r;
-
-		/* From intro(5):
-		 *   size[4] Rread tag[2] count[4] data[count]
-		 */
-		if (pkt.len < BIT32SZ)
-			return -EBADMSG;
-		_ptoh32(&pcnt, &pkt);
-
-		DEBUG("Received %zu bytes from the server\n", pcnt);
-		if (pkt.len < pcnt || pcnt > count)
-			return -EBADMSG;
-
-		/* From open(5):
-		 *   If the offset field is greater than or equal to the
-		 *   number of bytes in the file, a count of zero will
-		 *   be returned.
-		 */
-		if (!pcnt)
-			return -EFBIG;
-
-		memcpy(&dest[n], pkt.buf, pcnt);
-
-		n += pcnt;
-		if (pcnt < ocnt)
-			break;
-	}
-
-	return n;
+/**
+ * @todo
+ */
+ssize_t
+_9pwrite(_9pfid *f, char *src, size_t count)
+{
+	return _ioloop(f, src, count, Twrite);
 }
 
 /**
