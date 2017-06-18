@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <byteorder.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/types.h>
 
 #include "xtimer.h"
@@ -13,11 +14,6 @@
 /**
  * Global static buffer used for storing message specific parameters.
  * Message indepented parameters are stored on the stack using `_9ppkt`.
- *
- * @attention The functions writting to this buffer `_htop{8,16, 32,
- * 64}` and so assume that there is always enough space available and
- * (for performance reasons) do no perform any boundary checks when
- * writting to it.
  */
 static uint8_t buffer[_9P_MSIZE];
 
@@ -50,13 +46,338 @@ static uint32_t msize = _9P_MSIZE;
 /**
  * As with file descriptors, we need to store currently open fids
  * somehow. This is done in this static buffer. This buffer should only
- * be accessed using the ::_fidtbl function it should never be modified
+ * be accessed using the ::fidtbl function it should never be modified
  * directly.
  *
- * This buffer is not static because it is used in the ::_fidtbl
+ * This buffer is not static because it is used in the ::fidtbl
  * function from `util.c`.
  */
 _9pfid fids[_9P_MAXFIDS];
+
+/**
+ * @defgroup Static utility functions.
+ * @{
+ */
+
+/**
+ * Initializes the members of a packet buffer. The length field is set
+ * to the amount of bytes still available in the buffer and should be
+ * decremented when writing to the buffer.
+ *
+ * @param pkt Pointer to a packet for which the members should be
+ * 	initialized.
+ * @param type Type which should be used for this packet.
+ */
+void
+newpkt(_9ppkt *pkt, _9ptype type)
+{
+	pkt->buf = buffer + _9P_HEADSIZ;
+	pkt->len = msize - _9P_HEADSIZ;
+	pkt->type = type;
+}
+
+/**
+ * Parses the header (the first 7 bytes) of a 9P message contained in
+ * the given buffer. The result is written to the memory area pointed to
+ * by the `_9ppkt` buffer.
+ *
+ * The buflen parameter is a `uint32_t` and not a `size_t` because each
+ * 9P message begins with a four-byte size field specifying the size of
+ * the entire 9P message. Thus the message length will never exceed `2^32`
+ * bytes.
+ *
+ * @param pkt Pointer to memory area to store result in.
+ * @param buf Buffer containg the message which should be parsed.
+ * @param buflen Total length of the given buffer.
+ * @return `0` on success.
+ * @return `-EBADMSG` if the buffer content isn't a valid 9P message.
+ * @return `-ENOTSUP` if the message type isn't supported.
+ *   This is a client implementation thus we only support R-messages,
+ *   T-messages are not supported and yield this error code.
+ */
+static int
+_9pheader(_9ppkt *pkt, uint32_t buflen)
+{
+	uint8_t type;
+	uint32_t len;
+
+	pkt->buf = buffer;
+
+	/* From intro(5):
+	 *   Each 9P message begins with a four-byte size field
+	 *   specifying the length in bytes of the complete message
+	 *   including the four bytes of the size field itself.
+	 */
+	if (buflen < BIT32SZ)
+		return -EBADMSG;
+	ptoh32(&len, pkt);
+
+	DEBUG("Length of the 9P message: %zu\n", len);
+	if (len > buflen || len < _9P_HEADSIZ)
+		return -EBADMSG;
+	pkt->len = len - BIT32SZ;
+
+	/* From intro(5):
+	 *   The next byte is the message type, one of the constants in
+	 *   the enumeration in the include file <fcall.h>.
+	 */
+	ptoh8(&type, pkt);
+
+	DEBUG("Type of 9P message: %d\n", type);
+	if (type < Tversion || type >= Tmax)
+		return -EBADMSG;
+	if (type % 2 == 0)
+		return -ENOTSUP; /* Client only implementation */
+	pkt->type = (_9ptype)type;
+
+	/* From intro(5):
+	 *   The next two bytes are an identifying tag, described below.
+	 */
+	ptoh16(&pkt->tag, pkt);
+	DEBUG("Tag of 9P message: %d\n", pkt->tag);
+
+	return 0;
+}
+
+/**
+ * Performs a 9P request, meaning this function sends a T-message to the
+ * server, reads the R-message from the client and stores it in a memory
+ * location provided by the caller.
+ *
+ * Keep in mind that the same ::_9ppkt is being used for the T- and
+ * R-message, thus after calling this method you shouldn't can't access
+ * the R-message values anymore.
+ *
+ * The length field of the given packet should be equal to the amount of
+ * space (in bytes) still available in the packet buffer.
+ *
+ * @param p Pointer to the memory location containing the T-message. The
+ *   caller doesn't need to initialize the `tag` field of this message.
+ *   Besides this pointer is also used to store the R-message send by
+ *   the server as a reply.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+static int
+do9p(_9ppkt *p)
+{
+	ssize_t ret;
+	_9ptype ttype;
+	uint32_t reallen;
+	uint16_t ttag;
+
+	DEBUG("Sending message of type %d to server\n", p->type);
+
+	/* From version(5):
+	 *   The tag should be NOTAG (value (ushort)~0) for a version message.
+	 */
+	p->tag = (p->type == Tversion) ?
+		_9P_NOTAG : random_uint32();
+
+	p->buf = buffer; /* Reset buffer position. */
+	reallen = msize - p->len;
+
+	/* Build the "header", meaning: size[4] type[1] tag[2]
+	 * Every 9P message needs those first 7 bytes. */
+	htop32(reallen, p);
+	htop8(p->type, p);
+	htop16(p->tag, p);
+
+	DEBUG("Sending %zu bytes to server...\n", reallen);
+	if ((ret = sock_tcp_write(&sock, buffer, reallen)) < 0)
+		return ret;
+
+	/* Tag and type will be overwritten by _9pheader. */
+	ttype = p->type;
+	ttag = p->tag;
+
+	DEBUG("Reading from server...\n");
+	if ((ret = sock_tcp_read(&sock, buffer, msize, _9P_TIMOUT)) < 0)
+		return ret;
+
+	/* Maximum length of a 9P message is 2^32. */
+	if ((size_t)ret > UINT32_MAX)
+		return -EMSGSIZE;
+
+	DEBUG("Read %zu bytes from server, parsing them...\n", ret);
+	if ((ret = _9pheader(p, (uint32_t)ret)))
+		return ret;
+
+	if (p->tag != ttag) {
+		DEBUG("Tag mismatch (%d vs. %d)\n", p->tag, ttag);
+		return -EBADMSG;
+	}
+
+	if (p->type != ttype + 1) {
+		DEBUG("Unexpected value in type field: %d\n", p->type);
+		return -EBADMSG;
+	}
+
+	return 0;
+}
+
+/**
+ * Frees all resources allocated for a given fid on both the client and
+ * the server. Optionally the file associated with the fid can also be
+ * removed from the server.
+ *
+ * @pre t == Tclunk || t == Tremove
+ *
+ * @param f Pointer to fid on which the operation should be performed.
+ * @param t Type of the operation which should be performed.
+ *
+ * @return `0` on success, on error a negative errno is returned.
+ */
+static int
+fidrem(_9pfid *f, _9ptype t)
+{
+	int r;
+	_9ppkt pkt;
+
+	assert(t == Tclunk || t == Tremove);
+
+	/* From intro(5):
+	 *   size[4] Tclunk|Tremove tag[2] fid[4]
+	 */
+	newpkt(&pkt, t);
+	htop32(f->fid, &pkt);
+
+	if ((r = do9p(&pkt)))
+		return r;
+
+	/* From intro(5):
+	 *   size[4] Rclunk|Rremove tag[2]
+	 *
+	 * These first seven bytes are already parsed by do9p.
+	 * Therefore we don't need to parse anything here.
+	 */
+
+	if (!fidtbl(f->fid, DEL))
+		return -EBADF;
+
+	return 0;
+}
+
+/**
+ * Parses the body of a 9P Ropen or Rcreate message. The body of those
+ * two messages consists of a qid and an iounit. The values of both
+ * fields are stored in the given fid.
+ *
+ * @param f Pointer to the fid associated with the new file.
+ * @param pkt Pointer to the packet from which the body should be read.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+static int
+newfile(_9pfid *f, _9ppkt *pkt)
+{
+	if (hqid(&f->qid, pkt) || pkt->len < BIT32SZ)
+		return -EBADMSG;
+	ptoh32(&f->iounit, pkt);
+
+	/* From open(5):
+	 *   The iounit field returned by open and create may be zero.
+	 *   If it is not, it is the maximum number of bytes that are
+	 *   guaranteed to be read from or written to the file without
+	 *   breaking the I/O transfer into multiple 9P messages
+	 */
+	if (!f->iounit)
+		f->iounit = msize - _9P_IOHDRSIZ;
+
+	return 0;
+}
+
+/**
+ * Only a maximum of bytes can be transfered atomically. If the amonut
+ * of bytes we want to write to a file (or read from it) exceed this
+ * limit we need to send multiple R-messages to the server. This
+ * function takes care of doing this.
+ *
+ * @pre t == Twrite || t == Tread
+ *
+ * @param f Pointer to fid on which a read or write operation should be
+ * 	performed.
+ * @param buf Pointer to a buffer from which data should be written to
+ * 	or written from.
+ * @param count Amount of bytes that should be written or read from the
+ * 	file.
+ * @param t Type of the operation which should be performed.
+ */
+static int
+ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
+{
+	int r;
+	size_t n;
+	uint32_t pcnt, ocnt;
+	_9ppkt pkt;
+
+	assert(t == Twrite || t == Tread);
+
+	n = 0;
+	while (n < count) {
+		/* From intro(5):
+		 *   size[4] Tread tag[2] fid[4] offset[8] count[4]
+		 *   size[4] Twrite tag[2] fid[4] offset[8] count[4] data[count]
+		 */
+		newpkt(&pkt, t);
+		htop32(f->fid, &pkt);
+		htop64(n, &pkt);
+
+		if (count - n <= UINT32_MAX)
+			pcnt = count - n;
+		else
+			pcnt = UINT32_MAX;
+
+		if (pcnt > f->iounit)
+			pcnt = f->iounit;
+		htop32(pcnt, &pkt);
+
+		if (t == Twrite) {
+			if (pcnt > pkt.len - BIT32SZ)
+				pcnt = pkt.len - BIT32SZ;
+			if (!pcnt) return -EOVERFLOW;
+			bufcpy(&pkt, &buf[n], pcnt);
+		}
+
+		DEBUG("Sending %s with offset %zu and count %zu\n",
+			(t == Tread) ? "Tread" : "Twrite", n, pcnt);
+
+		if ((r = do9p(&pkt)))
+			return r;
+
+		/* From intro(5):
+		 *   size[4] Rread tag[2] count[4] data[count]
+		 *   size[4] Rwrite tag[2] count[4]
+		 */
+		ocnt = pcnt;
+		if (pkt.len < BIT32SZ)
+			return -EBADMSG;
+		ptoh32(&pcnt, &pkt);
+
+		/* From open(5):
+		 *   If the offset field is greater than or equal to the
+		 *   number of bytes in the file, a count of zero will
+		 *   be returned.
+		 */
+		if (!pcnt)
+			return -EFBIG;
+
+		if (pcnt > count)
+			return -EBADMSG;
+
+		if (t == Tread) {
+			if (pkt.len < pcnt)
+				return -EBADMSG;
+			memcpy(&buf[n], pkt.buf, pcnt);
+		}
+
+		n += pcnt;
+		if (pcnt < ocnt)
+			break;
+	}
+
+	return n;
+}
+
+/**@}*/
 
 /**
  * Initializes the 9P module. Among other things it opens a TCP socket
@@ -92,141 +413,6 @@ _9pclose(void)
 }
 
 /**
- * Parses the header (the first 7 bytes) of a 9P message contained in
- * the given buffer. The result is written to the memory area pointed to
- * by the `_9ppkt` buffer.
- *
- * The buflen parameter is a `uint32_t` and not a `size_t` because each
- * 9P message begins with a four-byte size field specifying the size of
- * the entire 9P message. Thus the message length will never exceed `2^32`
- * bytes.
- *
- * @param pkt Pointer to memory area to store result in.
- * @param buf Buffer containg the message which should be parsed.
- * @param buflen Total length of the given buffer.
- * @return `0` on success.
- * @return `-EBADMSG` if the buffer content isn't a valid 9P message.
- * @return `-ENOTSUP` if the message type isn't supported.
- *   This is a client implementation thus we only support R-messages,
- *   T-messages are not supported and yield this error code.
- */
-static int
-_9pheader(_9ppkt *pkt, uint32_t buflen)
-{
-	uint8_t type;
-
-	pkt->buf = buffer;
-
-	/* From intro(5):
-	 *   Each 9P message begins with a four-byte size field
-	 *   specifying the length in bytes of the complete message
-	 *   including the four bytes of the size field itself.
-	 */
-	if (buflen < BIT32SZ)
-		return -EBADMSG;
-	_ptoh32(&pkt->len, pkt);
-
-	DEBUG("Length of the 9P message: %d\n", pkt->len);
-	if (pkt->len > buflen || pkt->len < _9P_HEADSIZ)
-		return -EBADMSG;
-
-	/* From intro(5):
-	 *   The next byte is the message type, one of the constants in
-	 *   the enumeration in the include file <fcall.h>.
-	 */
-	_ptoh8(&type, pkt);
-
-	DEBUG("Type of 9P message: %d\n", type);
-	if (type < Tversion || type >= Tmax)
-		return -EBADMSG;
-	if (type % 2 == 0)
-		return -ENOTSUP; /* Client only implementation */
-	pkt->type = (_9ptype)type;
-
-	/* From intro(5):
-	 *   The next two bytes are an identifying tag, described below.
-	 */
-	_ptoh16(&pkt->tag, pkt);
-	DEBUG("Tag of 9P message: %d\n", pkt->tag);
-
-	return 0;
-}
-
-/**
- * Performs a 9P request, meaning this function sends a T-message to the
- * server, reads the R-message from the client and stores it in a memory
- * location provided by the caller.
- *
- * Keep in mind that the same ::_9ppkt is being used for the T- and
- * R-message, thus after calling this method you shouldn't can't access
- * the R-message values anymore.
- *
- * @param p Pointer to the memory location containing the T-message. The
- *   caller doesn't need to initialize the `tag` field of this message.
- *   Besides this pointer is also used to store the R-message send by
- *   the server as a reply.
- * @return `0` on success, on error a negative errno is returned.
- */
-static int
-_do9p(_9ppkt *p)
-{
-	ssize_t ret;
-	_9ptype ttype;
-	uint16_t ttag;
-	uint8_t head[_9P_HEADSIZ], *headpos;
-
-	headpos = head;
-	DEBUG("Sending message of type %d to server\n", p->type);
-
-	/* From version(5):
-	 *   The tag should be NOTAG (value (ushort)~0) for a version message.
-	 */
-	p->tag = (p->type == Tversion) ?
-		_9P_NOTAG : random_uint32();
-
-	/* Build the "header", meaning: size[4] type[1] tag[2]
-	 * Every 9P message needs those first 7 bytes. */
-	headpos = _htop32(headpos, p->len + _9P_HEADSIZ);
-	headpos = _htop8(headpos, p->type);
-	headpos = _htop16(headpos, p->tag);
-
-	DEBUG("Sending %d bytes to server...\n", _9P_HEADSIZ + p->len);
-	if ((ret = sock_tcp_write(&sock, head, _9P_HEADSIZ)) < 0)
-		return ret;
-	if (p->len > 0 && (ret = sock_tcp_write(&sock,
-			p->buf, p->len)) < 0)
-		return ret;
-
-	DEBUG("Reading from server...\n");
-	if ((ret = sock_tcp_read(&sock, buffer, msize, _9P_TIMOUT)) < 0)
-		return ret;
-
-	/* Tag and type will be overwritten by _9pheader. */
-	ttype = p->type;
-	ttag = p->tag;
-
-	/* Maximum length of a 9P message is 2^32. */
-	if ((unsigned)ret > UINT32_MAX) /* ret is >= 0 at this point. */
-		return -EBADMSG;
-
-	DEBUG("Read %d bytes from server, parsing them...\n", ret);
-	if ((ret = _9pheader(p, (uint32_t)ret)))
-		return ret;
-
-	if (p->tag != ttag) {
-		DEBUG("Tag mismatch (%d vs. %d)\n", p->tag, ttag);
-		return -EBADMSG;
-	}
-
-	if (p->type != ttype + 1) {
-		DEBUG("Unexpected value in type field: %d\n", p->type);
-		return -EBADMSG;
-	}
-
-	return 0;
-}
-
-/**
  * From version(5):
  *   The version request negotiates the protocol version and message
  *   size to be used on the connection and initializes the connection
@@ -250,20 +436,17 @@ _9pversion(void)
 {
 	int r;
 	char ver[_9P_VERLEN];
-	uint8_t *bufpos;
 	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tversion tag[2] msize[4] version[s]
 	 */
-	pkt.type = Tversion;
-	bufpos = _htop32(bufpos, _9P_MSIZE);
-	bufpos = _pstring(bufpos, _9P_VERSION);
+	newpkt(&pkt, Tversion);
+	htop32(_9P_MSIZE, &pkt);
+	if (pstring(_9P_VERSION, &pkt))
+		return -EOVERFLOW;
 
-	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return r;
 
 	/* From intro(5):
@@ -276,7 +459,7 @@ _9pversion(void)
 	 */
 	if (pkt.len <= 10)
 		return -EBADMSG;
-	_ptoh32(&msize, &pkt);
+	ptoh32(&msize, &pkt);
 
 	DEBUG("Msize of Rversion message: %d\n", msize);
 
@@ -287,6 +470,9 @@ _9pversion(void)
 	if (msize > _9P_MSIZE) {
 		DEBUG("Servers msize is too large (%d)\n", msize);
 		return -EMSGSIZE;
+	} else if (msize < _9P_MINSIZE) {
+		DEBUG("Servers msize is too small (%d)\n", msize);
+		return -EOVERFLOW;
 	}
 
 	/* From version(5):
@@ -294,7 +480,7 @@ _9pversion(void)
 	 *  string, it should respond with an Rversion message (not
 	 *  Rerror) with the version string the 7 characters `unknown`.
          */
-	if (_hstring(ver, _9P_VERLEN, &pkt))
+	if (hstring(ver, _9P_VERLEN, &pkt))
 		return -EBADMSG;
 
 	DEBUG("Version string reported by server: %s\n", ver);
@@ -324,33 +510,29 @@ int
 _9pattach(_9pfid **dest, char *uname, char *aname)
 {
 	int r;
-	uint8_t *bufpos;
 	_9pfid *fid;
 	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tattach tag[2] fid[4] afid[4] uname[s] aname[s]
 	 */
-	pkt.type = Tattach;
-	bufpos = _htop32(bufpos, _9P_ROOTFID);
-	bufpos = _htop32(bufpos, _9P_NOFID);
-	bufpos = _pstring(bufpos, uname);
-	bufpos = _pstring(bufpos, aname);
+	newpkt(&pkt, Tattach);
+	htop32(_9P_ROOTFID, &pkt);
+	htop32(_9P_NOFID, &pkt);
+	if (pstring(uname, &pkt) || pstring(aname, &pkt))
+		return -EOVERFLOW;
 
-	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return r;
 
 	/* From intro(5):
 	 *   size[4] Rattach tag[2] qid[13]
 	 */
-	if (!(fid = _fidtbl(_9P_ROOTFID, ADD)))
+	if (!(fid = fidtbl(_9P_ROOTFID, ADD)))
 		return -ENFILE;
 	fid->fid = _9P_ROOTFID;
 
-	if (_hqid(&fid->qid, &pkt)) {
+	if (hqid(&fid->qid, &pkt)) {
 		fid->fid = 0; /* mark fid as free. */
 		return -EBADMSG;
 	}
@@ -359,6 +541,22 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
 
 	*dest = fid;
 	return 0;
+}
+
+/**
+ * From clunk(5):
+ *   The clunk request informs the file server that the current file
+ *   represented by fid is no longer needed by the client. The actual
+ *   file is not removed on the server unless the fid had been opened
+ *   with ORCLOSE.
+ *
+ * @param f Pointer to a fid which should be closed.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+inline int
+_9pclunk(_9pfid *f)
+{
+	return fidrem(f, Tclunk);
 }
 
 /**
@@ -379,21 +577,16 @@ int
 _9pstat(_9pfid *fid, struct stat *b)
 {
 	int r;
-	uint8_t *bufpos;
 	uint32_t mode;
-	uint16_t nstat;
 	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tstat tag[2] fid[4]
 	 */
-	pkt.type = Tstat;
-	bufpos = _htop32(bufpos, fid->fid);
+	newpkt(&pkt, Tstat);
+	htop32(fid->fid, &pkt);
 
-	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	if ((r = do9p(&pkt)))
 		return -1;
 
 	/* From intro(5):
@@ -404,33 +597,20 @@ _9pstat(_9pfid *fid, struct stat *b)
 	if (pkt.len < _9P_STATSIZ)
 		return -EBADMSG;
 
-	/* From intro(5):
-	 *   The notation parameter[n] where n is not a constant
-	 *   represents a variable-length parameter: n[2] followed by n
-	 *   bytes of data forming the parameter.
-	 *
-	 * The nstat value should be equal to pkt.len at this point.
-	 */
-	_ptoh16(&nstat, &pkt);
-
-	DEBUG("nstat: %d\n", nstat);
-	if (nstat != pkt.len)
-		return -EBADMSG;
-
 	/* Skip: n[2], size[2], type[2] and dev[4]. */
-	ADVBUF(&pkt, 2 * BIT16SZ + BIT32SZ);
+	advbuf(&pkt, 3 * BIT16SZ + BIT32SZ);
 
 	/* store qid informations in given fid. */
-	if (_hqid(&fid->qid, &pkt))
+	if (hqid(&fid->qid, &pkt))
 		return -EBADMSG;
 
 	/* store the other information in the stat struct. */
-	_ptoh32(&mode, &pkt);
+	ptoh32(&mode, &pkt);
 	b->st_mode = (mode & DMDIR) ? S_IFDIR : S_IFREG;
-	_ptoh32((uint32_t*)&b->st_atime, &pkt);
-	_ptoh32((uint32_t*)&b->st_mtime, &pkt);
+	ptoh32((uint32_t*)&b->st_atime, &pkt);
+	ptoh32((uint32_t*)&b->st_mtime, &pkt);
 	b->st_ctime = b->st_mtime;
-	_ptoh64((uint64_t*)&b->st_size, &pkt);
+	ptoh64((uint64_t*)&b->st_size, &pkt);
 
 	/* information for stat struct we cannot extract from the reply. */
 	b->st_dev = b->st_ino = b->st_rdev = 0;
@@ -440,7 +620,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 	b->st_blocks = b->st_size / b->st_blksize + 1;
 
 	/* extract the file name and store it in the fid. */
-	if (_hstring(fid->path, _9P_PTHMAX, &pkt))
+	if (hstring(fid->path, _9P_PTHMAX, &pkt))
 		return -EBADMSG;
 
 	/* uid, gid and muid are ignored. */
@@ -479,7 +659,7 @@ _9pwalk(_9pfid **dest, char *path)
 	int r;
 	char *cur, *sep;
 	size_t n, i, len;
-	uint8_t *bufpos, *nwname;
+	uint8_t *nwname;
 	uint16_t nwqid;
 	ptrdiff_t elen;
 	_9pfid *fid;
@@ -487,10 +667,9 @@ _9pwalk(_9pfid **dest, char *path)
 
 	if (*path == '\0' || !strcmp(path, "/"))
 		return -EINVAL; /* TODO */
-	bufpos = pkt.buf = buffer;
 
 	len = strlen(path);
-	if (len > UINT16_MAX)
+	if (len >= _9P_PTHMAX)
 		return -EINVAL;
 	if (!(fid = newfid()))
 		return -ENFILE;
@@ -499,34 +678,42 @@ _9pwalk(_9pfid **dest, char *path)
 	 *   size[4] Twalk tag[2] fid[4] newfid[4] nwname[2]
 	 *   nwname*(wname[s])
 	 */
-	pkt.type = Twalk;
-	bufpos = _htop32(bufpos, _9P_ROOTFID);
-	bufpos = nwname = _htop32(bufpos, fid->fid);
-	bufpos += 2; /* leave space for nwname[2]. */
+	newpkt(&pkt, Twalk);
+	htop32(_9P_ROOTFID, &pkt);
+	htop32(fid->fid, &pkt);
+
+	/* leave space for nwname[2]. */
+	nwname = pkt.buf;
+	advbuf(&pkt, BIT16SZ);
 
 	/* generate nwname*(wname[s]) */
 	for (n = i = 0; i < len; n++, i += elen + 1) {
 		if (n >= _9P_MAXWEL) {
-			r = -EINVAL;
+			r = -ENAMETOOLONG;
 			goto err;
 		}
 
 		cur = &path[i];
-		if (!(sep = strchr(cur, '/')))
+		if (!(sep = strchr(cur, _9P_PATHSEP)))
 			sep = &path[len - 1] + 1; /* XXX */
-		elen = sep - cur;
 
-		/* XXX this is a duplication of the _pstring func. */
-		bufpos = _htop16(bufpos, elen);
-		memcpy(bufpos, cur, elen);
-		bufpos += elen;
+		elen = sep - cur;
+		if ((size_t)elen > pkt.len - BIT32SZ) {
+			r = -EOVERFLOW;
+			goto err;
+		}
+
+		htop16(elen, &pkt);
+		bufcpy(&pkt, cur, elen);
 	}
 
 	DEBUG("Constructed Twalk with %d elements\n", n);
-	_htop16(nwname, n); /* nwname[2] */
 
-	pkt.len = bufpos - pkt.buf;
-	if ((r = _do9p(&pkt)))
+	pkt.buf = nwname;
+	pkt.len += BIT16SZ;
+	htop16(n, &pkt);
+
+	if ((r = do9p(&pkt)))
 		goto err;
 
 	/* From intro(5):
@@ -536,7 +723,7 @@ _9pwalk(_9pfid **dest, char *path)
 		r = -EBADMSG;
 		goto err;
 	}
-	_ptoh16(&nwqid, &pkt);
+	ptoh16(&nwqid, &pkt);
 
 	/**
 	 * From walk(5):
@@ -550,19 +737,151 @@ _9pwalk(_9pfid **dest, char *path)
 	}
 
 	/* Retrieve the last qid. */
-	ADVBUF(&pkt, (nwqid - 1) * _9P_QIDSIZ);
-	if (_hqid(&fid->qid, &pkt)) {
+	advbuf(&pkt, (nwqid - 1) * _9P_QIDSIZ);
+	if (hqid(&fid->qid, &pkt)) {
 		r = -EBADMSG;
 		goto err;
 	}
 
-	strncpy(fid->path, path, _9P_PTHMAX);
-	fid->path[_9P_PTHMAX - 1] = '\0';
+	/* Copy string, overflow check is performed above. */
+	strcpy(fid->path, path);
 
 	*dest = fid;
 	return 0;
 
 err:
-	assert(_fidtbl(fid->fid, DEL) != NULL);
+	assert(fidtbl(fid->fid, DEL) != NULL);
 	return r;
+}
+
+/**
+ * From open(5):
+ *   The open request asks the file server to check permissions and
+ *   prepare a fid for I/O with subsequent read and write messages.
+ *
+ * @param f Fid which should be opened for I/O.
+ * @param flags Flags used for opening the fid. Supported flags are:
+ * 	OREAD, OWRITE, ORDWR and OTRUNC.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+int
+_9popen(_9pfid *f, int flags)
+{
+	int r;
+	_9ppkt pkt;
+
+	/* From intro(5):
+	 *   size[4] Topen tag[2] fid[4] mode[1]
+	 */
+	newpkt(&pkt, Topen);
+	htop32(f->fid, &pkt);
+	htop8(flags, &pkt);
+
+	if ((r = do9p(&pkt)))
+		return r;
+
+	/* From intro(5):
+	 *   size[4] Ropen tag[2] qid[13] iounit[4]
+	 */
+	if ((r = newfile(f, &pkt)))
+		return r;
+
+	return 0;
+}
+
+/**
+ * From open(5):
+ *   The create request asks the file server to create a new file with the name
+ *   supplied, in the directory (dir) represented by fid, and requires write
+ *   permission in the directory
+ *
+ * After creation the file will be opened automatically. And the given
+ * fid will no longer represent the directory, instead it now represents
+ * the newly created file.
+ *
+ * @param Pointer to the fid associated with the directory in which a
+ * 	new file should be created.
+ * @param name Name which should be used for the newly created file.
+ * @param perm Permissions with which the new file should be created.
+ * @param flags Flags which should be used for opening the file
+ *   afterwards. See ::_9popen.
+ */
+int
+_9pcreate(_9pfid *f, char *name, int perm, int flags)
+{
+	int r;
+	_9ppkt pkt;
+
+	/* From intro(5):
+	 *   size[4] Tcreate tag[2] fid[4] name[s] perm[4] mode[1]
+	 */
+	newpkt(&pkt, Tcreate);
+	htop32(f->fid, &pkt);
+	if (pstring(name, &pkt) || BIT32SZ + BIT8SZ > pkt.len)
+		return -EOVERFLOW;
+	htop32(perm, &pkt);
+	htop8(flags, &pkt);
+
+	if ((r = do9p(&pkt)))
+		return r;
+
+	/* From intro(5):
+	 *   size[4] Rcreate tag[2] qid[13] iounit[4]
+	 */
+	if ((r = newfile(f, &pkt)))
+		return r;
+
+	return 0;
+}
+
+/**
+ * From read(5):
+ *   The read request asks for count bytes of data from the file
+ *   identified by fid, which must be opened for reading, start-
+ *   ing offset bytes after the beginning of the file.
+ *
+ * @param f Fid from which data should be read.
+ * @param dest Pointer to a buffer to which the received data should be
+ * 	written.
+ * @param count Amount of data that should be read.
+ * @return The number of bytes read on success or a negative errno on
+ * 	error.
+ */
+inline ssize_t
+_9pread(_9pfid *f, char *dest, size_t count)
+{
+	return ioloop(f, dest, count, Tread);
+}
+
+/**
+ * From intro(5):
+ *   The write request asks that count bytes of data be recorded in the
+ *   file identified by fid, which must be opened for writing, starting
+ *   offset bytes after the beginning of the file.
+ *
+ * @param f Pointer to the fid to which data should be written.
+ * @param src Pointer to a buffer containing the data which should be
+ * 	written to the file.
+ * @param count Amount of bytes which should be written to the file
+ * @return The number of bytes read on success or a negative errno on
+ * 	error.
+ */
+ssize_t
+_9pwrite(_9pfid *f, char *src, size_t count)
+{
+	return ioloop(f, src, count, Twrite);
+}
+
+/**
+ * From remove(5):
+ *   The remove request asks the file server both to remove the file
+ *   represented by fid and to clunk the fid, even if the remove fails.
+ *
+ * @param f Pointer to the fid which should be removed.
+ * @return `0` on success, on error a negative errno is returned.
+ */
+inline int
+_9premove(_9pfid *f)
+{
+	return fidrem(f, Tremove);
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"github.com/Harvey-OS/ninep/protocol"
 )
 
@@ -26,12 +27,25 @@ var ctlcmds = map[string]ServerReply{
 	"rattach_success":     {RattachSuccess, protocol.Tattach},
 	"rattach_invalid_len": {RattachInvalidLength, protocol.Tattach},
 
-	"rstat_success":       {RstatSuccess, protocol.Tstat},
-	"rstat_nstat_invalid": {RstatNstatInvalid, protocol.Tstat},
+	"rstat_success": {RstatSuccess, protocol.Tstat},
 
 	"rwalk_success":         {RwalkSuccess, protocol.Twalk},
 	"rwalk_invalid_len":     {RwalkInvalidLen, protocol.Twalk},
 	"rwalk_nwqid_too_large": {RwalkNwqidTooLarge, protocol.Twalk},
+
+	"ropen_success": {RopenSuccess, protocol.Topen},
+
+	"rcreate_success": {RcreateSuccess, protocol.Tcreate},
+
+	"rread_success":     {RreadSuccess, protocol.Tread},
+	"rread_with_offset": {RreadWithOffset, protocol.Tread},
+	"rread_count_zero":  {RreadCountZero, protocol.Tread},
+
+	"rwrite_success": {RwriteSuccess, protocol.Twrite},
+
+	"rclunk_success": {RclunkSuccess, protocol.Tclunk},
+
+	"remove_success": {RremoveSuccess, protocol.Tremove},
 }
 
 // Replies with a single byte. This is thus even shorter than the four-byte
@@ -311,41 +325,6 @@ func RstatSuccess(b *bytes.Buffer) error {
 	return nil
 }
 
-// Replies with a stat message containing an invalid two-byte nstat
-// field which would cause the message to be longer than indicated in
-// the size field.
-func RstatNstatInvalid(b *bytes.Buffer) error {
-	_, t, err := protocol.UnmarshalTstatPkt(b)
-	if err != nil {
-		return err
-	}
-
-	var B bytes.Buffer
-	var D protocol.Dir
-
-	protocol.Marshaldir(&B, D)
-
-	var l uint64
-	var n uint16 = uint16(1337)
-
-	b.Reset()
-	b.Write([]byte{0, 0, 0, 0,
-		uint8(protocol.Rstat),
-		byte(t), byte(t >> 8),
-		uint8(n >> 0),
-		uint8(n >> 8),
-	})
-
-	b.Write(B.Bytes())
-
-	{
-		l = uint64(b.Len())
-		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
-	}
-
-	return nil
-}
-
 // Replies with a valid Rwalk message. The last QID is different then
 // the other ones to test off-by-one errors. The client must be able
 // to parse this R-message.
@@ -416,5 +395,119 @@ func RwalkNwqidTooLarge(b *bytes.Buffer) error {
 	}
 
 	protocol.MarshalRwalkPkt(b, t, qids)
+	return nil
+}
+
+// Replies with a valid Ropen message. The iounit of the reply will
+// always be `1337`. The client must be able to parse this.
+func RopenSuccess(b *bytes.Buffer) error {
+	_, _, t, err := protocol.UnmarshalTopenPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRopenPkt(b, t, protocol.QID{}, 1337)
+	return nil
+}
+
+// Replies with a vaild Rcreate message. The client must be able to
+// parse this.
+func RcreateSuccess(b *bytes.Buffer) error {
+	_, _, _, _, t, err := protocol.UnmarshalTcreatePkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRcreatePkt(b, t, protocol.QID{}, 9001)
+	return nil
+}
+
+// Replies with a valid Rread message. The data field of the message
+// should hold the string `Hello!`. The client must be able to parse
+// this. This function ignores the count sent by the client.
+func RreadSuccess(b *bytes.Buffer) error {
+	_, _, _, t, err := protocol.UnmarshalTreadPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRreadPkt(b, t, []byte("Hello!"))
+	return nil
+}
+
+// Replies with a valid Rread message. The data field of the message is
+// set to `1234567890`. Contrary to RreadSuccess this function respects
+// the offset and count send by the client.
+func RreadWithOffset(b *bytes.Buffer) error {
+	_, o, l, t, err := protocol.UnmarshalTreadPkt(b)
+	if err != nil {
+		return err
+	}
+
+	poff := int(o)
+	plen := int(l)
+
+	hstr := "1234567890"
+	hlen := len(hstr)
+
+	if poff > hlen {
+		return errors.New("offset is too large")
+	}
+	if plen > hlen {
+		hlen = plen
+	}
+
+	data := hstr[poff : poff+plen]
+
+	protocol.MarshalRreadPkt(b, t, []byte(data))
+	return nil
+}
+
+// Replies with a valid Rread message which contains a count field with
+// the value `0`. The client must be able to parse this but should
+// treat the message as an error.
+func RreadCountZero(b *bytes.Buffer) error {
+	_, _, _, t, err := protocol.UnmarshalTreadPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRreadPkt(b, t, []byte(""))
+	return nil
+}
+
+// Replies with a valid Rwrite message. The client must be able to parse
+// this.
+func RwriteSuccess(b *bytes.Buffer) error {
+	_, _, Data, t, err := protocol.UnmarshalTwritePkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRwritePkt(b, t, protocol.Count(len(Data)))
+	return nil
+}
+
+// Replies with a valid Rclunk message. The client must be able to parse
+// this.
+func RclunkSuccess(b *bytes.Buffer) error {
+	_, t, err := protocol.UnmarshalTclunkPkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRclunkPkt(b, t)
+	return nil
+}
+
+// Replies with a valid Rremove message. The client must be able to
+// parse this.
+func RremoveSuccess(b *bytes.Buffer) error {
+	_, t, err := protocol.UnmarshalTremovePkt(b)
+	if err != nil {
+		return err
+	}
+
+	protocol.MarshalRremovePkt(b, t)
 	return nil
 }

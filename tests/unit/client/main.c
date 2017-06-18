@@ -1,3 +1,10 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "9pfs.h"
 #include "xtimer.h"
 
@@ -9,6 +16,19 @@
 #include "net/sock/tcp.h"
 
 #include "embUnit.h"
+
+/**
+ * Retrieve value of environment variable using getenv(3) and return
+ * `EXIT_FAILURE` if the result was a NULL pointer.
+ *
+ * @param VAR Name of the variable to store result in.
+ * @param ENV Name of the environment variable.
+ */
+#define GETENV(VAR, ENV) \
+	do { if (!(VAR = getenv(ENV))) { \
+		printf("%s is not set or empty\n", ENV); \
+		return EXIT_FAILURE; } \
+	} while (0)
 
 /**
  * TCP control socket
@@ -46,119 +66,161 @@ set_up(void)
  */
 
 static void
-test_9putil__pstring_and_hstring(void)
+test_9putil_pstring_and_hstring(void)
 {
 	_9ppkt pkt;
 	uint8_t buf[10];
 	char dest[10];
 
-	_pstring(buf, "foobar");
 	pkt.buf = buf;
 	pkt.len = 10;
 
-	TEST_ASSERT_EQUAL_INT(0, _hstring(dest, 10, &pkt));
+	TEST_ASSERT_EQUAL_INT(0, pstring("foobar", &pkt));
+
+	pkt.buf = buf;
+	pkt.len = 10;
+
+	TEST_ASSERT_EQUAL_INT(0, hstring(dest, 10, &pkt));
 	TEST_ASSERT_EQUAL_STRING("foobar", (char*)dest);
 }
 
 static void
-test_9putil__pstring_empty_string(void)
+test_9putil_pstring_empty_string(void)
 {
 	_9ppkt pkt;
 	uint8_t buf[2];
 	char dest[2];
 
-	_pstring(buf, NULL);
 	pkt.buf = buf;
 	pkt.len = 4;
 
-	TEST_ASSERT_EQUAL_INT(0, _hstring(dest, 2, &pkt));
+	TEST_ASSERT_EQUAL_INT(0, pstring(NULL, &pkt));
+
+	pkt.buf = buf;
+	pkt.len = 4;
+
+	TEST_ASSERT_EQUAL_INT(0, hstring(dest, 2, &pkt));
 	TEST_ASSERT_EQUAL_STRING("", (char*)dest);
 }
 
 static void
-test_9putil__hstring_invalid1(void)
+test_9putil_pstring_buffer_to_small1(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[1];
+
+	pkt.buf = buf;
+	pkt.len = 1;
+
+	TEST_ASSERT_EQUAL_INT(-1, pstring(NULL, &pkt));
+}
+
+static void
+test_9putil_pstring_buffer_to_small2(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[5];
+
+	pkt.buf = buf;
+	pkt.len = 5;
+
+	TEST_ASSERT_EQUAL_INT(-1, pstring("lolz", &pkt));
+}
+
+static void
+test_9putil_hstring_invalid1(void)
 {
 	_9ppkt pkt;
 	uint8_t buf[10];
 	char dest[10];
 
-	_pstring(buf, "kek");
 	pkt.buf = buf;
 	pkt.len = BIT16SZ - 1;
 
-	TEST_ASSERT_EQUAL_INT(-1, _hstring(dest, 10, &pkt));
+	TEST_ASSERT_EQUAL_INT(0, pstring("kek", &pkt));
+
+	pkt.buf = buf;
+	pkt.len = BIT16SZ - 1;
+
+	TEST_ASSERT_EQUAL_INT(-1, hstring(dest, 10, &pkt));
 }
 
 static void
-test_9putil__hstring_invalid2(void)
+test_9putil_hstring_invalid2(void)
 {
 	_9ppkt pkt;
 	uint8_t buf[5];
 	char dest[5];
 
 	pkt.len = 5;
-	_htop16(buf, 5);
+	pkt.buf = buf;
 
-	TEST_ASSERT_EQUAL_INT(-1, _hstring(dest, 5, &pkt));
+	htop16(pkt.len, &pkt);
+
+	pkt.len = 5;
+	pkt.buf = buf;
+
+	TEST_ASSERT_EQUAL_INT(-1, hstring(dest, 5, &pkt));
 }
 
 static void
-test_9putil__hstring_invalid3(void)
+test_9putil_hstring_invalid3(void)
 {
 	_9ppkt pkt;
 	uint8_t buf[5];
 	char dest[5];
-
-	_pstring(buf, "foo");
-	_htop16(buf, 42);
 
 	pkt.buf = buf;
 	pkt.len = 5;
 
-	TEST_ASSERT_EQUAL_INT(-1, _hstring(dest, 5, &pkt));
+	TEST_ASSERT_EQUAL_INT(0, pstring("foo", &pkt));
+	pkt.buf = buf;
+	htop16(42, &pkt);
+
+	TEST_ASSERT_EQUAL_INT(-1, hstring(dest, 5, &pkt));
 }
 
 static void
-test_9putil__fidtbl_add(void)
+test_9putil_fidtbl_add(void)
 {
 	_9pfid *f;
 
-	f = _fidtbl(23, ADD);
+	f = fidtbl(23, ADD);
 
 	TEST_ASSERT_NOT_NULL(f);
 	TEST_ASSERT_EQUAL_INT(0, f->fid);
 }
 
 static void
-test_9putil__fidtbl_add_invalid(void)
+test_9putil_fidtbl_add_invalid(void)
 {
-	TEST_ASSERT_NULL(_fidtbl(0, ADD));
+	TEST_ASSERT_NULL(fidtbl(0, ADD));
 }
 
 static void
-test_9putil__fidtbl_add_full(void)
+test_9putil_fidtbl_add_full(void)
 {
 	_9pfid *f;
 	size_t i;
 
 	for (i = 1; i <= _9P_MAXFIDS; i++) {
-		f = _fidtbl(i, ADD);
+		f = fidtbl(i, ADD);
 		f->fid = i;
 	}
 
-	TEST_ASSERT_NULL(_fidtbl(++i, ADD));
+	TEST_ASSERT_NULL(fidtbl(++i, ADD));
 }
 
 static void
-test_9putil__fidtbl_get(void)
+test_9putil_fidtbl_get(void)
 {
 	_9pfid *f1, *f2;
 
-	f1 = _fidtbl(42, ADD);
+	f1 = fidtbl(42, ADD);
 	f1->fid = 42;
 	strcpy(f1->path, "foobar");
 
-	f2 = _fidtbl(42, GET);
+	f2 = fidtbl(42, GET);
 
 	TEST_ASSERT_NOT_NULL(f2);
 	TEST_ASSERT_EQUAL_INT(42, f2->fid);
@@ -166,25 +228,25 @@ test_9putil__fidtbl_get(void)
 }
 
 static void
-test_9putil__fidtbl_delete(void)
+test_9putil_fidtbl_delete(void)
 {
 	_9pfid *f1, *f2;
 
-	f1 = _fidtbl(1337, ADD);
+	f1 = fidtbl(1337, ADD);
 	f1->fid = 1337;
 
-	f2 = _fidtbl(1337, DEL);
+	f2 = fidtbl(1337, DEL);
 
 	TEST_ASSERT_NOT_NULL(f2);
 	TEST_ASSERT_EQUAL_INT(0, f2->fid);
-	TEST_ASSERT_NULL(_fidtbl(1337, GET));
+	TEST_ASSERT_NULL(fidtbl(1337, GET));
 }
 
 static void
-test_9putil__fidtbl_delete_rootfid(void)
+test_9putil_fidtbl_delete_rootfid(void)
 {
-	_fidtbl(_9P_ROOTFID, ADD);
-	TEST_ASSERT_NULL(_fidtbl(_9P_ROOTFID, DEL));
+	fidtbl(_9P_ROOTFID, ADD);
+	TEST_ASSERT_NULL(fidtbl(_9P_ROOTFID, DEL));
 }
 
 static void
@@ -195,7 +257,7 @@ test_9putil__newfid(void)
 	f1 = newfid();
 	TEST_ASSERT_NOT_NULL(f1);
 
-	f2 = _fidtbl(f1->fid, GET);
+	f2 = fidtbl(f1->fid, GET);
 	TEST_ASSERT_NOT_NULL(f2);
 
 	TEST_ASSERT_EQUAL_INT(f1->fid, f2->fid);
@@ -205,18 +267,20 @@ Test*
 tests_9putil_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
-		new_TestFixture(test_9putil__pstring_and_hstring),
-		new_TestFixture(test_9putil__hstring_invalid1),
-		new_TestFixture(test_9putil__hstring_invalid2),
-		new_TestFixture(test_9putil__hstring_invalid3),
-		new_TestFixture(test_9putil__pstring_empty_string),
+		new_TestFixture(test_9putil_pstring_and_hstring),
+		new_TestFixture(test_9putil_pstring_empty_string),
+		new_TestFixture(test_9putil_pstring_buffer_to_small1),
+		new_TestFixture(test_9putil_pstring_buffer_to_small2),
+		new_TestFixture(test_9putil_hstring_invalid1),
+		new_TestFixture(test_9putil_hstring_invalid2),
+		new_TestFixture(test_9putil_hstring_invalid3),
 
-		new_TestFixture(test_9putil__fidtbl_add),
-		new_TestFixture(test_9putil__fidtbl_add_invalid),
-		new_TestFixture(test_9putil__fidtbl_add_full),
-		new_TestFixture(test_9putil__fidtbl_get),
-		new_TestFixture(test_9putil__fidtbl_delete),
-		new_TestFixture(test_9putil__fidtbl_delete_rootfid),
+		new_TestFixture(test_9putil_fidtbl_add),
+		new_TestFixture(test_9putil_fidtbl_add_invalid),
+		new_TestFixture(test_9putil_fidtbl_add_full),
+		new_TestFixture(test_9putil_fidtbl_get),
+		new_TestFixture(test_9putil_fidtbl_delete),
+		new_TestFixture(test_9putil_fidtbl_delete_rootfid),
 
 		new_TestFixture(test_9putil__newfid),
 	};
@@ -384,16 +448,6 @@ test_9pfs__rstat_success(void)
 }
 
 static void
-test_9pfs__nstat_invalid(void)
-{
-	_9pfid f;
-	struct stat st;
-
-	setcmd("rstat_nstat_invalid\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pstat(&f, &st));
-}
-
-static void
 test_9pfs__rwalk_success(void)
 {
 	_9pfid *f;
@@ -404,6 +458,8 @@ test_9pfs__rwalk_success(void)
 	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
 	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
 	TEST_ASSERT_EQUAL_INT(1337, f->qid.path);
+
+	TEST_ASSERT_EQUAL_STRING("foo/bar", (char*)f->path);
 }
 
 static void
@@ -435,6 +491,170 @@ test_9pfs__rwalk_nwqid_too_large(void)
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&f, "foo"));
 }
 
+static void
+test_9pfs__ropen_success(void)
+{
+	_9pfid f;
+
+	f.fid = 42;
+
+	setcmd("ropen_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9popen(&f, 0));
+	TEST_ASSERT_EQUAL_INT(1337, f.iounit);
+}
+
+static void
+test_9pfs__rcreate_success(void)
+{
+	_9pfid f;
+
+	f.fid = 4223;
+
+	setcmd("rcreate_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9pcreate(&f, "hurrdurr", ORDWR, 0));
+	TEST_ASSERT_EQUAL_INT(9001, f.iounit);
+}
+
+static void
+test_9pfs__rread_success(void)
+{
+	_9pfid f;
+	ssize_t ret;
+	char dest[7];
+
+	setcmd("rread_success\n");
+
+	f.fid = 42;
+	f.iounit = 50;
+
+	ret = _9pread(&f, dest, 6);
+	TEST_ASSERT_EQUAL_INT(6, ret);
+
+	dest[ret] = '\0';
+	TEST_ASSERT_EQUAL_STRING("Hello!", (char*)dest);
+}
+
+static void
+test_9pfs__rread_with_offset(void)
+{
+	_9pfid f;
+	ssize_t ret;
+	char dest[11];
+
+	// Set command twice because with an iounit of 5
+	// we need to send two requests to receive the
+	// entire file.
+	setcmd("rread_with_offset\n");
+	setcmd("rread_with_offset\n");
+
+	f.fid = 23;
+	f.iounit = 5;
+
+	ret = _9pread(&f, dest, 10);
+	TEST_ASSERT_EQUAL_INT(10, ret);
+
+	dest[ret] = '\0';
+	TEST_ASSERT_EQUAL_STRING("1234567890", (char*)dest);
+}
+
+static void
+test_9pfs__rread_count_zero(void)
+{
+	_9pfid f;
+	char dest[11];
+
+	setcmd("rread_count_zero\n");
+
+	f.fid = 42;
+	f.iounit = 1337;
+
+	TEST_ASSERT_EQUAL_INT(-EFBIG, _9pread(&f, dest, 10));
+}
+
+static void
+test_9pfs__rread_with_larger_count(void)
+{
+	_9pfid f;
+	ssize_t ret;
+	char dest[7];
+
+	setcmd("rread_success\n");
+
+	f.fid = 5;
+	f.iounit = 100;
+
+	ret = _9pread(&f, dest, 100);
+	TEST_ASSERT_EQUAL_INT(6, ret);
+
+	dest[ret] = '\0';
+	TEST_ASSERT_EQUAL_STRING("Hello!", (char*)dest);
+}
+
+static void
+test_9pfs__rwrite_success(void)
+{
+	_9pfid f;
+	char *str = "hurrdurr";
+	size_t l;
+
+	setcmd("rwrite_success\n");
+
+	f.fid = 9002;
+	f.iounit = 50;
+
+	l = strlen(str);
+	TEST_ASSERT_EQUAL_INT(l, _9pwrite(&f, str, l));
+
+}
+
+static void
+test_9pfs__rclunk_success(void)
+{
+	_9pfid *f;
+
+	setcmd("rclunk_success\n");
+
+	f = fidtbl(23, ADD);
+	f->fid = 23;
+
+	TEST_ASSERT_EQUAL_INT(0, _9pclunk(f));
+}
+
+static void
+test_9pfs__rclunk_bad_fid(void)
+{
+	_9pfid f;
+
+	setcmd("rclunk_success\n");
+
+	f.fid = 42;
+	TEST_ASSERT_EQUAL_INT(-EBADF, _9pclunk(&f));
+}
+
+static void
+test_9pfs__rremove_success(void)
+{
+	_9pfid *f;
+
+	setcmd("remove_success\n");
+
+	f = fidtbl(9, ADD);
+	f->fid = 9;
+
+	TEST_ASSERT_EQUAL_INT(0, _9premove(f));
+}
+
+static void
+test_9pfs__rremove_bad_fid(void)
+{
+	_9pfid f;
+
+	setcmd("remove_success\n");
+
+	f.fid = 5;
+	TEST_ASSERT_EQUAL_INT(-EBADF, _9premove(&f));
+}
+
 Test*
 tests_9pfs_tests(void)
 {
@@ -458,12 +678,28 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__rattach_invalid_len),
 
 		new_TestFixture(test_9pfs__rstat_success),
-		new_TestFixture(test_9pfs__nstat_invalid),
 
 		new_TestFixture(test_9pfs__rwalk_success),
 		new_TestFixture(test_9pfs__rwalk_invalid_len),
 		new_TestFixture(test_9pfs__rwalk_path_too_long),
 		new_TestFixture(test_9pfs__rwalk_nwqid_too_large),
+
+		new_TestFixture(test_9pfs__ropen_success),
+
+		new_TestFixture(test_9pfs__rcreate_success),
+
+		new_TestFixture(test_9pfs__rread_success),
+		new_TestFixture(test_9pfs__rread_with_offset),
+		new_TestFixture(test_9pfs__rread_count_zero),
+		new_TestFixture(test_9pfs__rread_with_larger_count),
+
+		new_TestFixture(test_9pfs__rwrite_success),
+
+		new_TestFixture(test_9pfs__rclunk_success),
+		new_TestFixture(test_9pfs__rclunk_bad_fid),
+
+		new_TestFixture(test_9pfs__rremove_success),
+		new_TestFixture(test_9pfs__rremove_bad_fid),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
@@ -475,17 +711,22 @@ tests_9pfs_tests(void)
 int
 main(void)
 {
+	char *addr, *cport, *pport;
 	static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
 	static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
 
-	pr.port = PPORT;
-	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, REMOTE_ADDR);
+	GETENV(addr, "NINERIOT_ADDR");
+	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, addr);
+	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, addr);
 
-	cr.port = CPORT;
-	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, REMOTE_ADDR);
+	GETENV(pport, "NINERIOT_PPORT");
+	GETENV(cport, "NINERIOT_CPORT");
+
+	pr.port = atoi(pport);
+	cr.port = atoi(cport);
 
 	if (sock_tcp_connect(&csock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0) {
 		puts("Couldn't connect to control server");
@@ -505,5 +746,5 @@ main(void)
 	sock_tcp_disconnect(&csock);
 	_9pclose();
 
-	return 0;
+	return EXIT_SUCCESS;
 }

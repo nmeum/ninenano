@@ -6,6 +6,68 @@
 extern _9pfid fids[_9P_MAXFIDS];
 
 /**
+ * From intro(5):
+ *   Each message consists of a sequence of bytes. Two-, four-, and
+ *   eight-byte fields hold unsigned integers represented in
+ *   little-endian order (least significant byte first).
+ *
+ * Since we want to write an endian-agnostic implementation we define a
+ * macro called `_9p_swap` which is similar to `_byteorder_swap` but
+ * doesn't swap the byte order on little endian plattforms.
+ */
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#   define _9p_swap(V, T) (V)
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#   define _9p_swap(V, T) (byteorder_swap##T((V)))
+#else
+#   error "Byte order is neither little nor big!"
+#endif
+
+/**
+ * @defgroup Functions for packet buffers.
+ *
+ * @{
+ */
+
+/**
+ * Advances the position in the packet buffer. The macro takes care of
+ * decrementing the length field of the packet as well.
+ *
+ * @param pkt Pointer to a packet in which the buffer position should be
+ * 	advanced.
+ * @param off Offset which should be added to the buffer position.
+ */
+void
+advbuf(_9ppkt *pkt, size_t off)
+{
+	pkt->buf += off;
+	pkt->len -= off;
+}
+
+/**
+ * Copies n bytes from the given memory area to a packet buffer and
+ * afterwards advances the position in the packet buffer.
+ *
+ * @param pkt Pointer to a packet to which the data should be copied.
+ * @param src Pointer to a buffer from which the data should be read.
+ * @param n Amount of bytse which should be copied.
+ */
+void
+bufcpy(_9ppkt *pkt, void *src, size_t n)
+{
+	memcpy(pkt->buf, src, n);
+	advbuf(pkt, n);
+}
+
+/**@}*/
+
+/**
+ * @defgroup Functions for the fid table.
+ *
+ * @{
+ */
+
+/**
  * This function can be used to add, get and delete fids. It has one
  * unexpected caveat: The add operation does set the `fid` field, it
  * simply returns the next free fid. Thus the callers has to set the
@@ -20,7 +82,7 @@ extern _9pfid fids[_9P_MAXFIDS];
  *   on failure a NULL pointer is returned instead.
  */
 _9pfid*
-_fidtbl(uint32_t fid, _9pfidop op)
+fidtbl(uint32_t fid, _9pfidop op)
 {
 	_9pfid *ret;
 	size_t i, hash;
@@ -66,11 +128,11 @@ newfid(void)
 
 	for (i = 1; i < _9P_MAXFIDS; i++) {
 		fid = random_uint32_range(1, UINT32_MAX);
-		if (_fidtbl(fid, GET))
+		if (fidtbl(fid, GET))
 			continue;
 
-		/* TODO room for optimization don't call _fidtbl twice. */
-		r = _fidtbl(fid, ADD);
+		/* TODO room for optimization don't call fidtbl twice. */
+		r = fidtbl(fid, ADD);
 		assert(r != NULL);
 
 		r->fid = fid;
@@ -80,23 +142,7 @@ newfid(void)
 	return NULL;
 }
 
-/**
- * From intro(5):
- *   Each message consists of a sequence of bytes. Two-, four-, and
- *   eight-byte fields hold unsigned integers represented in
- *   little-endian order (least significant byte first).
- *
- * Since we want to write an endian-agnostic implementation we define a
- * macro called `_9p_swap` which is similar to `_byteorder_swap` but
- * doesn't swap the byte order on little endian plattforms.
- */
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#   define _9p_swap(V, T) (V)
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#   define _9p_swap(V, T) (byteorder_swap##T((V)))
-#else
-#   error "Byte order is neither little nor big!"
-#endif
+/**@}*/
 
 /**
  * @defgroup Functions for converting from host byte order to the byte \
@@ -106,50 +152,40 @@ newfid(void)
  * by the current CPU (the host system) to the one used by the protocol
  * (little-endian).
  *
- * To receive the integer which should be converted those functions read
- * a certain amount of bytes from the given buffer. Afterwards the
- * position in the buffer is advanced by the amount of bytes read and a
- * pointer to the new position is returned.
+ * These functions take two arguments: An unsigned integer and a pointer
+ * to a packet buffer to which the resulting integer in the protocol
+ * representation should be written. The position in the packet buffer
+ * is advanced after writting the integer to it.
  *
  * @{
  */
 
-uint8_t*
-_htop8(uint8_t *buf, uint8_t val)
+void
+htop8(uint8_t val, _9ppkt *pkt)
 {
-	*buf = val;
-	buf += BIT8SZ;
-	return buf;
+	*pkt->buf = val;
+	advbuf(pkt, BIT8SZ);
 }
 
-uint8_t*
-_htop16(uint8_t *buf, uint16_t val)
+void
+htop16(uint16_t val, _9ppkt *pkt)
 {
 	val = _9p_swap(val, s);
-	memcpy(buf, &val, BIT16SZ);
-
-	buf += BIT16SZ;
-	return buf;
+	bufcpy(pkt, &val, BIT16SZ);
 }
 
-uint8_t*
-_htop32(uint8_t *buf, uint32_t val)
+void
+htop32(uint32_t val, _9ppkt *pkt)
 {
 	val = _9p_swap(val, l);
-	memcpy(buf, &val, BIT32SZ);
-
-	buf += BIT32SZ;
-	return buf;
+	bufcpy(pkt, &val, BIT32SZ);
 }
 
-uint8_t*
-_htop64(uint8_t *buf, uint64_t val)
+void
+htop64(uint64_t val, _9ppkt *pkt)
 {
 	val = _9p_swap(val, ll);
-	memcpy(buf, &val, BIT64SZ);
-
-	buf += BIT64SZ;
-	return buf;
+	bufcpy(pkt, &val, BIT64SZ);
 }
 
 /**@}*/
@@ -171,34 +207,34 @@ _htop64(uint8_t *buf, uint64_t val)
  */
 
 void
-_ptoh8(uint8_t *dest, _9ppkt *pkt)
+ptoh8(uint8_t *dest, _9ppkt *pkt)
 {
 	*dest = *pkt->buf;
-	ADVBUF(pkt, BIT8SZ);
+	advbuf(pkt, BIT8SZ);
 }
 
 void
-_ptoh16(uint16_t *dest, _9ppkt *pkt)
+ptoh16(uint16_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT16SZ);
 	*dest = _9p_swap(*dest, s);
-	ADVBUF(pkt, BIT16SZ);
+	advbuf(pkt, BIT16SZ);
 }
 
 void
-_ptoh32(uint32_t *dest, _9ppkt *pkt)
+ptoh32(uint32_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT32SZ);
 	*dest = _9p_swap(*dest, l);
-	ADVBUF(pkt, BIT32SZ);
+	advbuf(pkt, BIT32SZ);
 }
 
 void
-_ptoh64(uint64_t *dest, _9ppkt *pkt)
+ptoh64(uint64_t *dest, _9ppkt *pkt)
 {
 	memcpy(dest, pkt->buf, BIT64SZ);
 	*dest = _9p_swap(*dest, ll);
-	ADVBUF(pkt, BIT64SZ);
+	advbuf(pkt, BIT64SZ);
 }
 
 /**@}*/
@@ -217,34 +253,39 @@ _ptoh64(uint64_t *dest, _9ppkt *pkt)
  * Converts the null-terminated string in the given buffer to a string
  * as defined in intro(5) prefixed with a two byte size field.
  *
- * Besides the position of the given buf pointer is advanced and a
- * pointer to the new position is returned.
+ * Besides the position of the given packet buffer is advanced. This
+ * function might fail if the string length exceeds the amount of bytes
+ * available in the packet buffer.
  *
- * @param buf Pointer to a buffer to which the resulting string should
- *   be written.
  * @param str Pointer to the null-terminated string.
+ * @param pkt Pointer to a packet to which the resulting string should
+ * 	be written.
  * @return Pointer to memory location in `buf` right behind the newly
  *   written string.
+ * @return `0` on success.
+ * @return `-1` on failure.
  */
-uint8_t*
-_pstring(uint8_t *buf, char *str)
+int
+pstring(char *str, _9ppkt *pkt)
 {
-	uint16_t len, siz;
+	size_t len;
 
 	if (!str) {
-		siz = _9p_swap(0, s);
-		memcpy(buf, &siz, BIT16SZ);
-		buf += BIT16SZ;
-		return buf;
+		if (BIT16SZ > pkt->len)
+			return -1;
+
+		len = _9p_swap(0, s);
+		htop16(len, pkt);
+		return 0;
 	}
 
 	len = strlen(str);
-	buf = _htop16(buf, len);
+	if (len > pkt->len - BIT16SZ)
+		return -1;
 
-	memcpy(buf, str, len);
-	buf += len;
-
-	return buf;
+	htop16((uint16_t)len, pkt);
+	bufcpy(pkt, str, len);
+	return 0;
 }
 
 /**
@@ -272,13 +313,13 @@ _pstring(uint8_t *buf, char *str)
  * @return `-1` on failure.
  */
 int
-_hstring(char *dest, uint16_t n, _9ppkt *pkt)
+hstring(char *dest, uint16_t n, _9ppkt *pkt)
 {
 	uint16_t siz;
 
 	if (pkt->len < BIT16SZ)
 		return -1;
-	_ptoh16(&siz, pkt);
+	ptoh16(&siz, pkt);
 
 	if (pkt->len < siz || siz >= n)
 		return -1;
@@ -314,14 +355,14 @@ _hstring(char *dest, uint16_t n, _9ppkt *pkt)
  * @return `-1` on failure.
  */
 int
-_hqid(_9pqid *dest, _9ppkt *pkt)
+hqid(_9pqid *dest, _9ppkt *pkt)
 {
 	if (pkt->len < _9P_QIDSIZ)
 		return -1;
 
-	_ptoh8(&dest->type, pkt);
-	_ptoh32(&dest->vers, pkt);
-	_ptoh64(&dest->path, pkt);
+	ptoh8(&dest->type, pkt);
+	ptoh32(&dest->vers, pkt);
+	ptoh64(&dest->path, pkt);
 
 	return 0;
 }

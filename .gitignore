@@ -1,3 +1,10 @@
-tests/server/src/
-tests/client/bin/
-tests/server/server
+tests/unit/server/src/
+tests/unit/client/bin/
+tests/unit/server/server
+
+tests/integration/server/src/
+tests/integration/client/bin/
+tests/integration/server/server
+
+tests/unit.log
+tests/integration.log

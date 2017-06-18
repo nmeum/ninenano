@@ -22,7 +22,7 @@
  *   receive in a single 9P message.
  */
 #ifndef _9P_MSIZE
-  #define _9P_MSIZE 8192
+  #define _9P_MSIZE 1024
 #endif
 
 /**
@@ -53,7 +53,7 @@
  * be tweaked by defining this macro.
  */
 #ifndef _9P_MAXFIDS
-  #define _9P_MAXFIDS 256
+  #define _9P_MAXFIDS 16
 #endif
 
 /**
@@ -145,6 +145,14 @@ enum {
 	 * Path seperator used to split a path into nwnames.
 	 */
 	_9P_PATHSEP = '/',
+
+	/**
+	 * Minimum msize we are able to handle. Only the Rwrite and
+	 * Rread message support sending more than one message for a
+	 * request. Therefore all other message types have to fit within
+	 * this limit.
+	 */
+	_9P_MINSIZE = 64,
 };
 
 /**
@@ -154,11 +162,30 @@ enum {
  *   tory), 0x40000000 (DMAPPEND, append only), 0x20000000
  *   (DMEXCL, exclusive use), 0x04000000 (DMTMP, temporary);
  *   these are echoed in Qid.type.
+ *
+ * These definition have been copied from the Plan 9 sourcetree.
+ * The file can be found at the location `sys/include/libc.h`.
  */
 #define DMDIR    0x80000000 /**< Mode bit for directories. */
 #define DMAPPEND 0x40000000 /**< Mode bit for append only files. */
 #define DMEXCL   0x20000000 /**< Mode bit for exclusive use files. */
 #define DMTMP    0x04000000 /**< Mode bit for non-backed-up file. */
+
+/* From open(5):
+ *   The mode field determines the type of I/O: 0 (called OREAD in
+ *   <libc.h>), 1 (OWRITE), 2 (ORDWR), and 3 (OEXEC) mean read access,
+ *   write access, read and write access, and execute access, to be
+ *   checked against the per- missions for the file. In addition, if
+ *   mode has the OTRUNC (0x10) bit set, the file is to be truncated
+ *   [...]
+ *
+ * These definition have been copied from the Plan 9 sourcetree.
+ * The file can be found at the location `sys/include/libc.h`.
+ */
+#define OREAD  0  /**< open for read */
+#define OWRITE 1  /**< write */
+#define ORDWR  2  /**< read and write */
+#define OTRUNC 16 /**< or'ed in (except for exec), truncate file first */
 
 /**
  * Valid values for the type field of a 9P message. This has been copied
@@ -264,6 +291,11 @@ typedef struct {
 	 * The qid associated with this fid.
 	 */
 	_9pqid qid;
+
+	/**
+	 * iounit for this file as returned by open(5).
+	 */
+	uint32_t iounit;
 } _9pfid;
 
 /**
@@ -299,40 +331,38 @@ typedef struct {
 	uint16_t tag;
 } _9ppkt;
 
-/**
- * Macro to advandce the position in the packet buffer. The macro takes
- * care of decrementing the length field of the packet as well.
- *
- * @param PKT Pointer to a packet in which the buffer position should be
- *   advanced.
- * @param OFF Offset which should be added to the buffer position.
- */
-#define ADVBUF(PKT, OFF) \
-	do { (PKT)->buf += OFF; (PKT)->len -= OFF; } while (0)
-
 int _9pinit(sock_tcp_ep_t);
 void _9pclose(void);
 
 int _9pversion(void);
 int _9pattach(_9pfid**, char*, char*);
+int _9pclunk(_9pfid*);
 int _9pstat(_9pfid*, struct stat*);
 int _9pwalk(_9pfid**, char*);
+int _9popen(_9pfid*, int);
+int _9pcreate(_9pfid*, char*, int, int);
+int _9pread(_9pfid*, char*, size_t);
+int _9pwrite(_9pfid*, char*, size_t);
+int _9premove(_9pfid*);
 
-_9pfid* _fidtbl(uint32_t, _9pfidop);
+void advbuf(_9ppkt*, size_t);
+void bufcpy(_9ppkt*, void*, size_t);
+
+_9pfid* fidtbl(uint32_t, _9pfidop);
 _9pfid* newfid(void);
 
-uint8_t* _pstring(uint8_t*, char*);
-int _hstring(char*, uint16_t, _9ppkt*);
-int _hqid(_9pqid*, _9ppkt*);
+int pstring(char*, _9ppkt*);
+int hstring(char*, uint16_t, _9ppkt*);
+int hqid(_9pqid*, _9ppkt*);
 
-uint8_t* _htop8(uint8_t*, uint8_t);
-uint8_t* _htop16(uint8_t*, uint16_t);
-uint8_t* _htop32(uint8_t*, uint32_t);
-uint8_t* _htop64(uint8_t*, uint64_t);
+void htop8(uint8_t, _9ppkt*);
+void htop16(uint16_t, _9ppkt*);
+void htop32(uint32_t, _9ppkt*);
+void htop64(uint64_t, _9ppkt*);
 
-void _ptoh8(uint8_t *dest, _9ppkt*);
-void _ptoh16(uint16_t *dest, _9ppkt*);
-void _ptoh32(uint32_t *dest, _9ppkt*);
-void _ptoh64(uint64_t *dest, _9ppkt*);
+void ptoh8(uint8_t *dest, _9ppkt*);
+void ptoh16(uint16_t *dest, _9ppkt*);
+void ptoh32(uint32_t *dest, _9ppkt*);
+void ptoh64(uint64_t *dest, _9ppkt*);
 
 #endif
