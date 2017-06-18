@@ -24,6 +24,12 @@ extern _9pfid fids[_9P_MAXFIDS];
 #endif
 
 /**
+ * @defgroup Functions for packet buffers.
+ *
+ * @{
+ */
+
+/**
  * Advances the position in the packet buffer. The macro takes care of
  * decrementing the length field of the packet as well.
  *
@@ -37,6 +43,23 @@ advbuf(_9ppkt *pkt, size_t off)
 	pkt->buf += off;
 	pkt->len -= off;
 }
+
+/**
+ * Copies n bytes from the given memory area to a packet buffer and
+ * afterwards advances the position in the packet buffer.
+ *
+ * @param pkt Pointer to a packet to which the data should be copied.
+ * @param src Pointer to a buffer from which the data should be read.
+ * @param n Amount of bytse which should be copied.
+ */
+void
+bufcpy(_9ppkt *pkt, void *src, size_t n)
+{
+	memcpy(pkt->buf, src, n);
+	advbuf(pkt, n);
+}
+
+/**@}*/
 
 /**
  * @defgroup Functions for the fid table.
@@ -129,50 +152,40 @@ newfid(void)
  * by the current CPU (the host system) to the one used by the protocol
  * (little-endian).
  *
- * To receive the integer which should be converted those functions read
- * a certain amount of bytes from the given buffer. Afterwards the
- * position in the buffer is advanced by the amount of bytes read and a
- * pointer to the new position is returned.
+ * These functions take two arguments: An unsigned integer and a pointer
+ * to a packet buffer to which the resulting integer in the protocol
+ * representation should be written. The position in the packet buffer
+ * is advanced after writting the integer to it.
  *
  * @{
  */
 
-uint8_t*
-htop8(uint8_t *buf, uint8_t val)
+void
+htop8(uint8_t val, _9ppkt *pkt)
 {
-	*buf = val;
-	buf += BIT8SZ;
-	return buf;
+	*pkt->buf = val;
+	advbuf(pkt, BIT8SZ);
 }
 
-uint8_t*
-htop16(uint8_t *buf, uint16_t val)
+void
+htop16(uint16_t val, _9ppkt *pkt)
 {
 	val = _9p_swap(val, s);
-	memcpy(buf, &val, BIT16SZ);
-
-	buf += BIT16SZ;
-	return buf;
+	bufcpy(pkt, &val, BIT16SZ);
 }
 
-uint8_t*
-htop32(uint8_t *buf, uint32_t val)
+void
+htop32(uint32_t val, _9ppkt *pkt)
 {
 	val = _9p_swap(val, l);
-	memcpy(buf, &val, BIT32SZ);
-
-	buf += BIT32SZ;
-	return buf;
+	bufcpy(pkt, &val, BIT32SZ);
 }
 
-uint8_t*
-htop64(uint8_t *buf, uint64_t val)
+void
+htop64(uint64_t val, _9ppkt *pkt)
 {
 	val = _9p_swap(val, ll);
-	memcpy(buf, &val, BIT64SZ);
-
-	buf += BIT64SZ;
-	return buf;
+	bufcpy(pkt, &val, BIT64SZ);
 }
 
 /**@}*/
@@ -240,34 +253,39 @@ ptoh64(uint64_t *dest, _9ppkt *pkt)
  * Converts the null-terminated string in the given buffer to a string
  * as defined in intro(5) prefixed with a two byte size field.
  *
- * Besides the position of the given buf pointer is advanced and a
- * pointer to the new position is returned.
+ * Besides the position of the given packet buffer is advanced. This
+ * function might fail if the string length exceeds the amount of bytes
+ * available in the packet buffer.
  *
- * @param buf Pointer to a buffer to which the resulting string should
- *   be written.
  * @param str Pointer to the null-terminated string.
+ * @param pkt Pointer to a packet to which the resulting string should
+ * 	be written.
  * @return Pointer to memory location in `buf` right behind the newly
  *   written string.
+ * @return `0` on success.
+ * @return `-1` on failure.
  */
-uint8_t*
-pstring(uint8_t *buf, char *str)
+int
+pstring(char *str, _9ppkt *pkt)
 {
-	uint16_t len, siz;
+	size_t len;
 
 	if (!str) {
-		siz = _9p_swap(0, s);
-		memcpy(buf, &siz, BIT16SZ);
-		buf += BIT16SZ;
-		return buf;
+		if (BIT16SZ > pkt->len)
+			return -1;
+
+		len = _9p_swap(0, s);
+		htop16(len, pkt);
+		return 0;
 	}
 
 	len = strlen(str);
-	buf = htop16(buf, len);
+	if (len > pkt->len - BIT16SZ)
+		return -1;
 
-	memcpy(buf, str, len);
-	buf += len;
-
-	return buf;
+	htop16((uint16_t)len, pkt);
+	bufcpy(pkt, str, len);
+	return 0;
 }
 
 /**

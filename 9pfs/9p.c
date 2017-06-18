@@ -14,11 +14,6 @@
 /**
  * Global static buffer used for storing message specific parameters.
  * Message indepented parameters are stored on the stack using `_9ppkt`.
- *
- * @attention The functions writting to this buffer `_htop{8,16, 32,
- * 64}` and so assume that there is always enough space available and
- * (for performance reasons) do no perform any boundary checks when
- * writting to it.
  */
 static uint8_t buffer[_9P_MSIZE];
 
@@ -63,6 +58,23 @@ _9pfid fids[_9P_MAXFIDS];
  * @defgroup Static utility functions.
  * @{
  */
+
+/**
+ * Initializes the members of a packet buffer. The length field is set
+ * to the amount of bytes still available in the buffer and should be
+ * decremented when writing to the buffer.
+ *
+ * @param pkt Pointer to a packet for which the members should be
+ * 	initialized.
+ * @param type Type which should be used for this packet.
+ */
+void
+newpkt(_9ppkt *pkt, _9ptype type)
+{
+	pkt->buf = buffer + _9P_HEADSIZ;
+	pkt->len = msize - _9P_HEADSIZ;
+	pkt->type = type;
+}
 
 /**
  * Parses the header (the first 7 bytes) of a 9P message contained in
@@ -136,6 +148,9 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
  * R-message, thus after calling this method you shouldn't can't access
  * the R-message values anymore.
  *
+ * The length field of the given packet should be equal to the amount of
+ * space (in bytes) still available in the packet buffer.
+ *
  * @param p Pointer to the memory location containing the T-message. The
  *   caller doesn't need to initialize the `tag` field of this message.
  *   Besides this pointer is also used to store the R-message send by
@@ -147,10 +162,9 @@ do9p(_9ppkt *p)
 {
 	ssize_t ret;
 	_9ptype ttype;
+	uint32_t reallen;
 	uint16_t ttag;
-	uint8_t head[_9P_HEADSIZ], *headpos;
 
-	headpos = head;
 	DEBUG("Sending message of type %d to server\n", p->type);
 
 	/* From version(5):
@@ -159,17 +173,17 @@ do9p(_9ppkt *p)
 	p->tag = (p->type == Tversion) ?
 		_9P_NOTAG : random_uint32();
 
+	p->buf = buffer; /* Reset buffer position. */
+	reallen = msize - p->len;
+
 	/* Build the "header", meaning: size[4] type[1] tag[2]
 	 * Every 9P message needs those first 7 bytes. */
-	headpos = htop32(headpos, p->len + _9P_HEADSIZ);
-	headpos = htop8(headpos, p->type);
-	headpos = htop16(headpos, p->tag);
+	htop32(reallen, p);
+	htop8(p->type, p);
+	htop16(p->tag, p);
 
-	DEBUG("Sending %zu bytes to server...\n", _9P_HEADSIZ + p->len);
-	if ((ret = sock_tcp_write(&sock, head, _9P_HEADSIZ)) < 0)
-		return ret;
-	if (p->len > 0 && (ret = sock_tcp_write(&sock,
-			p->buf, p->len)) < 0)
+	DEBUG("Sending %zu bytes to server...\n", reallen);
+	if ((ret = sock_tcp_write(&sock, buffer, reallen)) < 0)
 		return ret;
 
 	/* Tag and type will be overwritten by _9pheader. */
@@ -181,8 +195,8 @@ do9p(_9ppkt *p)
 		return ret;
 
 	/* Maximum length of a 9P message is 2^32. */
-	if ((unsigned)ret > UINT32_MAX) /* ret is >= 0 at this point. */
-		return -EBADMSG;
+	if ((size_t)ret > UINT32_MAX)
+		return -EMSGSIZE;
 
 	DEBUG("Read %zu bytes from server, parsing them...\n", ret);
 	if ((ret = _9pheader(p, (uint32_t)ret)))
@@ -217,20 +231,16 @@ static int
 fidrem(_9pfid *f, _9ptype t)
 {
 	int r;
-	uint8_t *bufpos;
 	_9ppkt pkt;
 
-	if (t != Tclunk && t != Tremove)
-		return -EINVAL;
-	bufpos = pkt.buf = buffer;
+	assert(t == Tclunk || t == Tremove);
 
 	/* From intro(5):
 	 *   size[4] Tclunk|Tremove tag[2] fid[4]
 	 */
-	pkt.type = t;
-	bufpos = htop32(bufpos, f->fid);
+	newpkt(&pkt, t);
+	htop32(f->fid, &pkt);
 
-	pkt.len = bufpos - pkt.buf;
 	if ((r = do9p(&pkt)))
 		return r;
 
@@ -297,15 +307,12 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 	int r;
 	size_t n;
 	uint32_t pcnt, ocnt;
-	uint8_t *bufpos;
 	_9ppkt pkt;
 
-	if (t != Twrite && t != Tread)
-		return -EINVAL;
+	assert(t == Twrite || t == Tread);
 
 	n = 0;
 	while (n < count) {
-		bufpos = pkt.buf = buffer;
 		DEBUG("Sending %s with offset %zu\n",
 			(t == Tread) ? "Tread" : "Twrite", n);
 
@@ -313,9 +320,9 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		 *   size[4] Tread tag[2] fid[4] offset[8] count[4]
 		 *   size[4] Twrite tag[2] fid[4] offset[8] count[4] data[count]
 		 */
-		pkt.type = t;
-		bufpos = htop32(bufpos, f->fid);
-		bufpos = htop64(bufpos, n);
+		newpkt(&pkt, t);
+		htop32(f->fid, &pkt);
+		htop64(n, &pkt);
 
 		if (count - n <= UINT32_MAX)
 			pcnt = count - n;
@@ -324,14 +331,15 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 
 		if (pcnt > f->iounit)
 			pcnt = f->iounit;
-		bufpos = htop32(bufpos, pcnt);
+		htop32(pcnt, &pkt);
 
 		if (t == Twrite) {
-			memcpy(bufpos, &buf[n], pcnt);
-			bufpos += pcnt;
+			if (pcnt > pkt.len - BIT32SZ)
+				pcnt = pkt.len - BIT32SZ;
+			if (!pcnt) return -EOVERFLOW;
+			bufcpy(&pkt, &buf[n], pcnt);
 		}
 
-		pkt.len = bufpos - pkt.buf;
 		if ((r = do9p(&pkt)))
 			return r;
 
@@ -428,19 +436,16 @@ _9pversion(void)
 {
 	int r;
 	char ver[_9P_VERLEN];
-	uint8_t *bufpos;
 	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tversion tag[2] msize[4] version[s]
 	 */
-	pkt.type = Tversion;
-	bufpos = htop32(bufpos, _9P_MSIZE);
-	bufpos = pstring(bufpos, _9P_VERSION);
+	newpkt(&pkt, Tversion);
+	htop32(_9P_MSIZE, &pkt);
+	if (pstring(_9P_VERSION, &pkt))
+		return -EOVERFLOW;
 
-	pkt.len = bufpos - pkt.buf;
 	if ((r = do9p(&pkt)))
 		return r;
 
@@ -465,6 +470,9 @@ _9pversion(void)
 	if (msize > _9P_MSIZE) {
 		DEBUG("Servers msize is too large (%d)\n", msize);
 		return -EMSGSIZE;
+	} else if (msize < _9P_MINSIZE) {
+		DEBUG("Servers msize is too small (%d)\n", msize);
+		return -EOVERFLOW;
 	}
 
 	/* From version(5):
@@ -502,22 +510,18 @@ int
 _9pattach(_9pfid **dest, char *uname, char *aname)
 {
 	int r;
-	uint8_t *bufpos;
 	_9pfid *fid;
 	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tattach tag[2] fid[4] afid[4] uname[s] aname[s]
 	 */
-	pkt.type = Tattach;
-	bufpos = htop32(bufpos, _9P_ROOTFID);
-	bufpos = htop32(bufpos, _9P_NOFID);
-	bufpos = pstring(bufpos, uname);
-	bufpos = pstring(bufpos, aname);
+	newpkt(&pkt, Tattach);
+	htop32(_9P_ROOTFID, &pkt);
+	htop32(_9P_NOFID, &pkt);
+	if (pstring(uname, &pkt) || pstring(aname, &pkt))
+		return -EOVERFLOW;
 
-	pkt.len = bufpos - pkt.buf;
 	if ((r = do9p(&pkt)))
 		return r;
 
@@ -573,19 +577,15 @@ int
 _9pstat(_9pfid *fid, struct stat *b)
 {
 	int r;
-	uint8_t *bufpos;
 	uint32_t mode;
 	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tstat tag[2] fid[4]
 	 */
-	pkt.type = Tstat;
-	bufpos = htop32(bufpos, fid->fid);
+	newpkt(&pkt, Tstat);
+	htop32(fid->fid, &pkt);
 
-	pkt.len = bufpos - pkt.buf;
 	if ((r = do9p(&pkt)))
 		return -1;
 
@@ -659,7 +659,7 @@ _9pwalk(_9pfid **dest, char *path)
 	int r;
 	char *cur, *sep;
 	size_t n, i, len;
-	uint8_t *bufpos, *nwname;
+	uint8_t *nwname;
 	uint16_t nwqid;
 	ptrdiff_t elen;
 	_9pfid *fid;
@@ -667,7 +667,6 @@ _9pwalk(_9pfid **dest, char *path)
 
 	if (*path == '\0' || !strcmp(path, "/"))
 		return -EINVAL; /* TODO */
-	bufpos = pkt.buf = buffer;
 
 	len = strlen(path);
 	if (len >= _9P_PTHMAX)
@@ -679,33 +678,41 @@ _9pwalk(_9pfid **dest, char *path)
 	 *   size[4] Twalk tag[2] fid[4] newfid[4] nwname[2]
 	 *   nwname*(wname[s])
 	 */
-	pkt.type = Twalk;
-	bufpos = htop32(bufpos, _9P_ROOTFID);
-	bufpos = nwname = htop32(bufpos, fid->fid);
-	bufpos += BIT16SZ; /* leave space for nwname[2]. */
+	newpkt(&pkt, Twalk);
+	htop32(_9P_ROOTFID, &pkt);
+	htop32(fid->fid, &pkt);
+
+	/* leave space for nwname[2]. */
+	nwname = pkt.buf;
+	advbuf(&pkt, BIT16SZ);
 
 	/* generate nwname*(wname[s]) */
 	for (n = i = 0; i < len; n++, i += elen + 1) {
 		if (n >= _9P_MAXWEL) {
-			r = -EINVAL;
+			r = -ENAMETOOLONG;
 			goto err;
 		}
 
 		cur = &path[i];
-		if (!(sep = strchr(cur, '/')))
+		if (!(sep = strchr(cur, _9P_PATHSEP)))
 			sep = &path[len - 1] + 1; /* XXX */
-		elen = sep - cur;
 
-		/* XXX this is a duplication of the pstring func. */
-		bufpos = htop16(bufpos, elen);
-		memcpy(bufpos, cur, elen);
-		bufpos += elen;
+		elen = sep - cur;
+		if ((size_t)elen > pkt.len - BIT32SZ) {
+			r = -EOVERFLOW;
+			goto err;
+		}
+
+		htop16(elen, &pkt);
+		bufcpy(&pkt, cur, elen);
 	}
 
 	DEBUG("Constructed Twalk with %d elements\n", n);
-	htop16(nwname, n); /* nwname[2] */
 
-	pkt.len = bufpos - pkt.buf;
+	pkt.buf = nwname;
+	pkt.len += BIT16SZ;
+	htop16(n, &pkt);
+
 	if ((r = do9p(&pkt)))
 		goto err;
 
@@ -761,19 +768,15 @@ int
 _9popen(_9pfid *f, int flags)
 {
 	int r;
-	uint8_t *bufpos;
 	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Topen tag[2] fid[4] mode[1]
 	 */
-	pkt.type = Topen;
-	bufpos = htop32(bufpos, f->fid);
-	bufpos = htop8(bufpos, flags);
+	newpkt(&pkt, Topen);
+	htop32(f->fid, &pkt);
+	htop8(flags, &pkt);
 
-	pkt.len = bufpos - pkt.buf;
 	if ((r = do9p(&pkt)))
 		return r;
 
@@ -807,21 +810,18 @@ int
 _9pcreate(_9pfid *f, char *name, int perm, int flags)
 {
 	int r;
-	uint8_t *bufpos;
 	_9ppkt pkt;
-
-	bufpos = pkt.buf = buffer;
 
 	/* From intro(5):
 	 *   size[4] Tcreate tag[2] fid[4] name[s] perm[4] mode[1]
 	 */
-	pkt.type = Tcreate;
-	bufpos = htop32(bufpos, f->fid);
-	bufpos = pstring(bufpos, name);
-	bufpos = htop32(bufpos, perm);
-	bufpos = htop8(bufpos, flags);
+	newpkt(&pkt, Tcreate);
+	htop32(f->fid, &pkt);
+	if (pstring(name, &pkt) || BIT32SZ + BIT8SZ > pkt.len)
+		return -EOVERFLOW;
+	htop32(perm, &pkt);
+	htop8(flags, &pkt);
 
-	pkt.len = bufpos - pkt.buf;
 	if ((r = do9p(&pkt)))
 		return r;
 

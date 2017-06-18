@@ -66,13 +66,17 @@ set_up(void)
  */
 
 static void
-test_9putil_pstring_andhstring(void)
+test_9putil_pstring_and_hstring(void)
 {
 	_9ppkt pkt;
 	uint8_t buf[10];
 	char dest[10];
 
-	pstring(buf, "foobar");
+	pkt.buf = buf;
+	pkt.len = 10;
+
+	TEST_ASSERT_EQUAL_INT(0, pstring("foobar", &pkt));
+
 	pkt.buf = buf;
 	pkt.len = 10;
 
@@ -87,12 +91,40 @@ test_9putil_pstring_empty_string(void)
 	uint8_t buf[2];
 	char dest[2];
 
-	pstring(buf, NULL);
+	pkt.buf = buf;
+	pkt.len = 4;
+
+	TEST_ASSERT_EQUAL_INT(0, pstring(NULL, &pkt));
+
 	pkt.buf = buf;
 	pkt.len = 4;
 
 	TEST_ASSERT_EQUAL_INT(0, hstring(dest, 2, &pkt));
 	TEST_ASSERT_EQUAL_STRING("", (char*)dest);
+}
+
+static void
+test_9putil_pstring_buffer_to_small1(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[1];
+
+	pkt.buf = buf;
+	pkt.len = 1;
+
+	TEST_ASSERT_EQUAL_INT(-1, pstring(NULL, &pkt));
+}
+
+static void
+test_9putil_pstring_buffer_to_small2(void)
+{
+	_9ppkt pkt;
+	uint8_t buf[5];
+
+	pkt.buf = buf;
+	pkt.len = 5;
+
+	TEST_ASSERT_EQUAL_INT(-1, pstring("lolz", &pkt));
 }
 
 static void
@@ -102,7 +134,11 @@ test_9putil_hstring_invalid1(void)
 	uint8_t buf[10];
 	char dest[10];
 
-	pstring(buf, "kek");
+	pkt.buf = buf;
+	pkt.len = BIT16SZ - 1;
+
+	TEST_ASSERT_EQUAL_INT(0, pstring("kek", &pkt));
+
 	pkt.buf = buf;
 	pkt.len = BIT16SZ - 1;
 
@@ -119,7 +155,10 @@ test_9putil_hstring_invalid2(void)
 	pkt.len = 5;
 	pkt.buf = buf;
 
-	htop16(buf, pkt.len);
+	htop16(pkt.len, &pkt);
+
+	pkt.len = 5;
+	pkt.buf = buf;
 
 	TEST_ASSERT_EQUAL_INT(-1, hstring(dest, 5, &pkt));
 }
@@ -131,11 +170,12 @@ test_9putil_hstring_invalid3(void)
 	uint8_t buf[5];
 	char dest[5];
 
-	pstring(buf, "foo");
-	htop16(buf, 42);
-
 	pkt.buf = buf;
 	pkt.len = 5;
+
+	TEST_ASSERT_EQUAL_INT(0, pstring("foo", &pkt));
+	pkt.buf = buf;
+	htop16(42, &pkt);
 
 	TEST_ASSERT_EQUAL_INT(-1, hstring(dest, 5, &pkt));
 }
@@ -227,11 +267,13 @@ Test*
 tests_9putil_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
-		new_TestFixture(test_9putil_pstring_andhstring),
+		new_TestFixture(test_9putil_pstring_and_hstring),
+		new_TestFixture(test_9putil_pstring_empty_string),
+		new_TestFixture(test_9putil_pstring_buffer_to_small1),
+		new_TestFixture(test_9putil_pstring_buffer_to_small2),
 		new_TestFixture(test_9putil_hstring_invalid1),
 		new_TestFixture(test_9putil_hstring_invalid2),
 		new_TestFixture(test_9putil_hstring_invalid3),
-		new_TestFixture(test_9putil_pstring_empty_string),
 
 		new_TestFixture(test_9putil_fidtbl_add),
 		new_TestFixture(test_9putil_fidtbl_add_invalid),

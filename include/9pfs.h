@@ -145,6 +145,14 @@ enum {
 	 * Path seperator used to split a path into nwnames.
 	 */
 	_9P_PATHSEP = '/',
+
+	/**
+	 * Minimum msize we are able to handle. Only the Rwrite and
+	 * Rread message support sending more than one message for a
+	 * request. Therefore all other message types have to fit within
+	 * this limit.
+	 */
+	_9P_MINSIZE = 64,
 };
 
 /**
@@ -338,17 +346,19 @@ int _9pwrite(_9pfid*, char*, size_t);
 int _9premove(_9pfid*);
 
 void advbuf(_9ppkt*, size_t);
+void bufcpy(_9ppkt*, void*, size_t);
+
 _9pfid* fidtbl(uint32_t, _9pfidop);
 _9pfid* newfid(void);
 
-uint8_t* pstring(uint8_t*, char*);
+int pstring(char*, _9ppkt*);
 int hstring(char*, uint16_t, _9ppkt*);
 int hqid(_9pqid*, _9ppkt*);
 
-uint8_t* htop8(uint8_t*, uint8_t);
-uint8_t* htop16(uint8_t*, uint16_t);
-uint8_t* htop32(uint8_t*, uint32_t);
-uint8_t* htop64(uint8_t*, uint64_t);
+void htop8(uint8_t, _9ppkt*);
+void htop16(uint16_t, _9ppkt*);
+void htop32(uint32_t, _9ppkt*);
+void htop64(uint64_t, _9ppkt*);
 
 void ptoh8(uint8_t *dest, _9ppkt*);
 void ptoh16(uint16_t *dest, _9ppkt*);
