@@ -313,9 +313,6 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 
 	n = 0;
 	while (n < count) {
-		DEBUG("Sending %s with offset %zu\n",
-			(t == Tread) ? "Tread" : "Twrite", n);
-
 		/* From intro(5):
 		 *   size[4] Tread tag[2] fid[4] offset[8] count[4]
 		 *   size[4] Twrite tag[2] fid[4] offset[8] count[4] data[count]
@@ -339,6 +336,9 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 			if (!pcnt) return -EOVERFLOW;
 			bufcpy(&pkt, &buf[n], pcnt);
 		}
+
+		DEBUG("Sending %s with offset %zu and count %zu\n",
+			(t == Tread) ? "Tread" : "Twrite", n, pcnt);
 
 		if ((r = do9p(&pkt)))
 			return r;
