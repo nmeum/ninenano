@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "9pfs.h"
+#include "9p.h"
 #include "xtimer.h"
 
 #include "lwip.h"
@@ -61,7 +61,7 @@ set_up(void)
 }
 
 /**
- * @defgroup Tests for utility functios from `9pfs/util.c`.
+ * @defgroup Tests for utility functios from `9p/util.c`.
  * @{
  */
 
@@ -293,7 +293,7 @@ tests_9putil_tests(void)
 /**@}*/
 
 /**
- * @defgroup Tests for protocol functions from `9pfs/9p.c`.
+ * @defgroup Tests for protocol functions from `9p/9p.c`.
  *
  * You might be wondering why there are no comments below this points.
  * This is the case because the purpose of the various test cases is
@@ -305,98 +305,98 @@ tests_9putil_tests(void)
  */
 
 static void
-test_9pfs__header_too_short1(void)
+test_9p__header_too_short1(void)
 {
-	setcmd("test_9pfs__header_too_short1\n");
+	setcmd("test_9p__header_too_short1\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_too_short2(void)
+test_9p__header_too_short2(void)
 {
-	setcmd("test_9pfs__header_too_short2\n");
+	setcmd("test_9p__header_too_short2\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_too_large(void)
+test_9p__header_too_large(void)
 {
 	setcmd("header_too_large\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_wrong_type(void)
+test_9p__header_wrong_type(void)
 {
 	setcmd("header_wrong_type\n");
 	TEST_ASSERT_EQUAL_INT(-ENOTSUP, _9pversion());
 }
 
 static void
-test_9pfs__header_invalid_type(void)
+test_9p__header_invalid_type(void)
 {
 	setcmd("header_invalid_type\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_tag_mismatch(void)
+test_9p__header_tag_mismatch(void)
 {
 	setcmd("header_tag_mismatch\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_type_mismatch(void)
+test_9p__header_type_mismatch(void)
 {
 	setcmd("header_type_mismatch\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__rversion_success(void)
+test_9p__rversion_success(void)
 {
 	setcmd("rversion_success\n");
 	TEST_ASSERT_EQUAL_INT(0, _9pversion());
 }
 
 static void
-test_9pfs__rversion_unknown(void)
+test_9p__rversion_unknown(void)
 {
 	setcmd("rversion_unknown\n");
 	TEST_ASSERT_EQUAL_INT(-ENOPROTOOPT, _9pversion());
 }
 
 static void
-test_9pfs__rversion_msize_too_big(void)
+test_9p__rversion_msize_too_big(void)
 {
 	setcmd("rversion_msize_too_big\n");
 	TEST_ASSERT_EQUAL_INT(-EMSGSIZE, _9pversion());
 }
 
 static void
-test_9pfs__rversion_invalid(void)
+test_9p__rversion_invalid(void)
 {
 	setcmd("rversion_invalid\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__rversion_invalid_len(void)
+test_9p__rversion_invalid_len(void)
 {
 	setcmd("rversion_invalid_len\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__rversion_version_too_long(void)
+test_9p__rversion_version_too_long(void)
 {
 	setcmd("rversion_version_too_long\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__rattach_success(void)
+test_9p__rattach_success(void)
 {
 	_9pfid *fid;
 
@@ -408,7 +408,7 @@ test_9pfs__rattach_success(void)
 }
 
 static void
-test_9pfs__rattach_invalid_len(void)
+test_9p__rattach_invalid_len(void)
 {
 	_9pfid *fid;
 
@@ -417,7 +417,7 @@ test_9pfs__rattach_invalid_len(void)
 }
 
 static void
-test_9pfs__rstat_success(void)
+test_9p__rstat_success(void)
 {
 	_9pfid f;
 	struct stat st;
@@ -448,7 +448,7 @@ test_9pfs__rstat_success(void)
 }
 
 static void
-test_9pfs__rwalk_success(void)
+test_9p__rwalk_success(void)
 {
 	_9pfid *f;
 
@@ -463,7 +463,7 @@ test_9pfs__rwalk_success(void)
 }
 
 static void
-test_9pfs__rwalk_invalid_len(void)
+test_9p__rwalk_invalid_len(void)
 {
 	_9pfid *f;
 
@@ -472,7 +472,7 @@ test_9pfs__rwalk_invalid_len(void)
 }
 
 static void
-test_9pfs__rwalk_path_too_long(void)
+test_9p__rwalk_path_too_long(void)
 {
 	_9pfid *f;
 	char *path;
@@ -483,7 +483,7 @@ test_9pfs__rwalk_path_too_long(void)
 }
 
 static void
-test_9pfs__rwalk_nwqid_too_large(void)
+test_9p__rwalk_nwqid_too_large(void)
 {
 	_9pfid *f;
 
@@ -492,7 +492,7 @@ test_9pfs__rwalk_nwqid_too_large(void)
 }
 
 static void
-test_9pfs__ropen_success(void)
+test_9p__ropen_success(void)
 {
 	_9pfid f;
 
@@ -504,7 +504,7 @@ test_9pfs__ropen_success(void)
 }
 
 static void
-test_9pfs__rcreate_success(void)
+test_9p__rcreate_success(void)
 {
 	_9pfid f;
 
@@ -516,7 +516,7 @@ test_9pfs__rcreate_success(void)
 }
 
 static void
-test_9pfs__rread_success(void)
+test_9p__rread_success(void)
 {
 	_9pfid f;
 	ssize_t ret;
@@ -535,7 +535,7 @@ test_9pfs__rread_success(void)
 }
 
 static void
-test_9pfs__rread_with_offset(void)
+test_9p__rread_with_offset(void)
 {
 	_9pfid f;
 	ssize_t ret;
@@ -558,7 +558,7 @@ test_9pfs__rread_with_offset(void)
 }
 
 static void
-test_9pfs__rread_count_zero(void)
+test_9p__rread_count_zero(void)
 {
 	_9pfid f;
 	char dest[11];
@@ -572,7 +572,7 @@ test_9pfs__rread_count_zero(void)
 }
 
 static void
-test_9pfs__rread_with_larger_count(void)
+test_9p__rread_with_larger_count(void)
 {
 	_9pfid f;
 	ssize_t ret;
@@ -591,7 +591,7 @@ test_9pfs__rread_with_larger_count(void)
 }
 
 static void
-test_9pfs__rwrite_success(void)
+test_9p__rwrite_success(void)
 {
 	_9pfid f;
 	char *str = "hurrdurr";
@@ -608,7 +608,7 @@ test_9pfs__rwrite_success(void)
 }
 
 static void
-test_9pfs__rclunk_success(void)
+test_9p__rclunk_success(void)
 {
 	_9pfid *f;
 
@@ -621,7 +621,7 @@ test_9pfs__rclunk_success(void)
 }
 
 static void
-test_9pfs__rclunk_bad_fid(void)
+test_9p__rclunk_bad_fid(void)
 {
 	_9pfid f;
 
@@ -632,7 +632,7 @@ test_9pfs__rclunk_bad_fid(void)
 }
 
 static void
-test_9pfs__rremove_success(void)
+test_9p__rremove_success(void)
 {
 	_9pfid *f;
 
@@ -645,7 +645,7 @@ test_9pfs__rremove_success(void)
 }
 
 static void
-test_9pfs__rremove_bad_fid(void)
+test_9p__rremove_bad_fid(void)
 {
 	_9pfid f;
 
@@ -656,54 +656,54 @@ test_9pfs__rremove_bad_fid(void)
 }
 
 Test*
-tests_9pfs_tests(void)
+tests_9p_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
-		new_TestFixture(test_9pfs__header_too_short1),
-		new_TestFixture(test_9pfs__header_too_short2),
-		new_TestFixture(test_9pfs__header_too_large),
-		new_TestFixture(test_9pfs__header_wrong_type),
-		new_TestFixture(test_9pfs__header_invalid_type),
-		new_TestFixture(test_9pfs__header_tag_mismatch),
-		new_TestFixture(test_9pfs__header_type_mismatch),
+		new_TestFixture(test_9p__header_too_short1),
+		new_TestFixture(test_9p__header_too_short2),
+		new_TestFixture(test_9p__header_too_large),
+		new_TestFixture(test_9p__header_wrong_type),
+		new_TestFixture(test_9p__header_invalid_type),
+		new_TestFixture(test_9p__header_tag_mismatch),
+		new_TestFixture(test_9p__header_type_mismatch),
 
-		new_TestFixture(test_9pfs__rversion_success),
-		new_TestFixture(test_9pfs__rversion_unknown),
-		new_TestFixture(test_9pfs__rversion_msize_too_big),
-		new_TestFixture(test_9pfs__rversion_invalid),
-		new_TestFixture(test_9pfs__rversion_invalid_len),
-		new_TestFixture(test_9pfs__rversion_version_too_long),
+		new_TestFixture(test_9p__rversion_success),
+		new_TestFixture(test_9p__rversion_unknown),
+		new_TestFixture(test_9p__rversion_msize_too_big),
+		new_TestFixture(test_9p__rversion_invalid),
+		new_TestFixture(test_9p__rversion_invalid_len),
+		new_TestFixture(test_9p__rversion_version_too_long),
 
-		new_TestFixture(test_9pfs__rattach_success),
-		new_TestFixture(test_9pfs__rattach_invalid_len),
+		new_TestFixture(test_9p__rattach_success),
+		new_TestFixture(test_9p__rattach_invalid_len),
 
-		new_TestFixture(test_9pfs__rstat_success),
+		new_TestFixture(test_9p__rstat_success),
 
-		new_TestFixture(test_9pfs__rwalk_success),
-		new_TestFixture(test_9pfs__rwalk_invalid_len),
-		new_TestFixture(test_9pfs__rwalk_path_too_long),
-		new_TestFixture(test_9pfs__rwalk_nwqid_too_large),
+		new_TestFixture(test_9p__rwalk_success),
+		new_TestFixture(test_9p__rwalk_invalid_len),
+		new_TestFixture(test_9p__rwalk_path_too_long),
+		new_TestFixture(test_9p__rwalk_nwqid_too_large),
 
-		new_TestFixture(test_9pfs__ropen_success),
+		new_TestFixture(test_9p__ropen_success),
 
-		new_TestFixture(test_9pfs__rcreate_success),
+		new_TestFixture(test_9p__rcreate_success),
 
-		new_TestFixture(test_9pfs__rread_success),
-		new_TestFixture(test_9pfs__rread_with_offset),
-		new_TestFixture(test_9pfs__rread_count_zero),
-		new_TestFixture(test_9pfs__rread_with_larger_count),
+		new_TestFixture(test_9p__rread_success),
+		new_TestFixture(test_9p__rread_with_offset),
+		new_TestFixture(test_9p__rread_count_zero),
+		new_TestFixture(test_9p__rread_with_larger_count),
 
-		new_TestFixture(test_9pfs__rwrite_success),
+		new_TestFixture(test_9p__rwrite_success),
 
-		new_TestFixture(test_9pfs__rclunk_success),
-		new_TestFixture(test_9pfs__rclunk_bad_fid),
+		new_TestFixture(test_9p__rclunk_success),
+		new_TestFixture(test_9p__rclunk_bad_fid),
 
-		new_TestFixture(test_9pfs__rremove_success),
-		new_TestFixture(test_9pfs__rremove_bad_fid),
+		new_TestFixture(test_9p__rremove_success),
+		new_TestFixture(test_9p__rremove_bad_fid),
 	};
 
-	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
-	return (Test*)&_9pfs_tests;
+	EMB_UNIT_TESTCALLER(_9p_tests, set_up, tear_down, fixtures);
+	return (Test*)&_9p_tests;
 }
 
 /**@}*/
@@ -740,7 +740,7 @@ main(void)
 
 	TESTS_START();
 	TESTS_RUN(tests_9putil_tests());
-	TESTS_RUN(tests_9pfs_tests());
+	TESTS_RUN(tests_9p_tests());
 	TESTS_END();
 
 	sock_tcp_disconnect(&csock);

@@ -1,6 +1,6 @@
 #include <sys/types.h>
 
-#include "9pfs.h"
+#include "9p.h"
 #include "random.h"
 
 extern _9pfid fids[_9P_MAXFIDS];

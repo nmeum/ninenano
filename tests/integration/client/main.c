@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "9pfs.h"
+#include "9p.h"
 #include "xtimer.h"
 
 #include "lwip.h"

@@ -6,7 +6,7 @@
 
 #include "xtimer.h"
 #include "random.h"
-#include "9pfs.h"
+#include "9p.h"
 
 #define ENABLE_DEBUG (1)
 #include "debug.h"
