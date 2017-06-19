@@ -50,7 +50,7 @@ static _9pfid *rootfid;
 static void
 set_up(void)
 {
-	if (_9pinit(remote))
+	if (_9pinit(&remote))
 		TEST_FAIL("_9pinit failed");
 
 	TEST_ASSERT_EQUAL_INT(0, _9pversion());

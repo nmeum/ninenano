@@ -712,15 +712,15 @@ int
 main(void)
 {
 	char *addr, *cport, *pport;
-	static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
-	static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
+	sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
+	sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
 
 	GETENV(addr, "NINERIOT_ADDR");
-	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, addr);
-	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, addr);
+	ipv6_addr_from_str((ipv6_addr_t*)&cr.addr, addr);
+	ipv6_addr_from_str((ipv6_addr_t*)&pr.addr, addr);
 
 	GETENV(pport, "NINERIOT_PPORT");
 	GETENV(cport, "NINERIOT_CPORT");
@@ -733,7 +733,7 @@ main(void)
 		return EXIT_FAILURE;
 	}
 
-	if (_9pinit(pr)) {
+	if (_9pinit(&pr)) {
 		puts("_9pinit failed");
 		return EXIT_FAILURE;
 	}

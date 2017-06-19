@@ -384,18 +384,18 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
  * but it does not initiate the connection with the server. This has to
  * be done manually using the ::_9pversion and ::_9pattach functions.
  *
- * @param remote Remote address of the server to connect to.
+ * @param remote Pointer to TCP endpoint of the server to connect to.
  * @return `0` on success, on error a negative errno is returned.
  */
 int
-_9pinit(sock_tcp_ep_t remote)
+_9pinit(sock_tcp_ep_t *remote)
 {
 	int r;
 
 	random_init(xtimer_now().ticks32);
 
 	DEBUG("Connecting to TCP socket...\n");
-	if ((r = sock_tcp_connect(&sock, &remote, 0, SOCK_FLAGS_REUSE_EP)))
+	if ((r = sock_tcp_connect(&sock, remote, 0, SOCK_FLAGS_REUSE_EP)))
 		return r;
 
 	return 0;

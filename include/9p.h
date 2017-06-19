@@ -331,7 +331,7 @@ typedef struct {
 	uint16_t tag;
 } _9ppkt;
 
-int _9pinit(sock_tcp_ep_t);
+int _9pinit(sock_tcp_ep_t*);
 void _9pclose(void);
 
 int _9pversion(void);
