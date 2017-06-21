@@ -130,11 +130,6 @@ enum {
 	_9P_ROOTFID = 1,
 
 	/**
-	 * Maximum size of a file path as used in a fid.
-	 */
-	_9P_PTHMAX = 32,
-
-	/**
 	 * From walk(5):
 	 *   To simplify the implementation of the servers, a maximum of
 	 *   sixteen name elements or qids may be packed in a single message.
@@ -293,11 +288,6 @@ typedef struct {
  *   being manipulated by the operating system - are identified by fids.
  */
 typedef struct {
-	/**
-	 * Path of this fid on the server.
-	 */
-	char path[_9P_PTHMAX];
-
 	/**
 	 * The 32-bit unsigned integer representation of this fid.
 	 */

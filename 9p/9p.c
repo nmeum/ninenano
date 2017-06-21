@@ -541,8 +541,6 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
 		return -EBADMSG;
 	}
 
-	*fid->path = '\0'; /* empty string */
-
 	*dest = fid;
 	return 0;
 }
@@ -623,11 +621,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 	b->st_blksize = msize - _9P_IOHDRSIZ;
 	b->st_blocks = b->st_size / b->st_blksize + 1;
 
-	/* extract the file name and store it in the fid. */
-	if (hstring(fid->path, _9P_PTHMAX, &pkt))
-		return -EBADMSG;
-
-	/* uid, gid and muid are ignored. */
+	/* name, uid, gid and muid are ignored. */
 
 	return 0;
 }
@@ -673,8 +667,6 @@ _9pwalk(_9pfid **dest, char *path)
 		return -EINVAL; /* TODO */
 
 	len = strlen(path);
-	if (len >= _9P_PTHMAX)
-		return -EINVAL;
 	if (!(fid = newfid()))
 		return -ENFILE;
 
@@ -746,9 +738,6 @@ _9pwalk(_9pfid **dest, char *path)
 		r = -EBADMSG;
 		goto err;
 	}
-
-	/* Copy string, overflow check is performed above. */
-	strcpy(fid->path, path);
 
 	*dest = fid;
 	return 0;

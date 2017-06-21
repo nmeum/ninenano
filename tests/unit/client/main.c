@@ -218,13 +218,11 @@ test_9putil_fidtbl_get(void)
 
 	f1 = fidtbl(42, ADD);
 	f1->fid = 42;
-	strcpy(f1->path, "foobar");
 
 	f2 = fidtbl(42, GET);
 
 	TEST_ASSERT_NOT_NULL(f2);
 	TEST_ASSERT_EQUAL_INT(42, f2->fid);
-	TEST_ASSERT_EQUAL_STRING("foobar", (char*)f2->path);
 }
 
 static void
@@ -402,8 +400,6 @@ test_9p__rattach_success(void)
 
 	setcmd("rattach_success\n");
 	TEST_ASSERT_EQUAL_INT(0, _9pattach(&fid, "foo", NULL));
-
-	TEST_ASSERT_EQUAL_STRING("", (char*)fid->path);
 	TEST_ASSERT(fid->fid > 0);
 }
 
@@ -443,8 +439,6 @@ test_9p__rstat_success(void)
 	TEST_ASSERT_EQUAL_INT(0, st.st_gid);
 	TEST_ASSERT_EQUAL_INT(_9P_MSIZE - _9P_IOHDRSIZ, st.st_blksize);
 	TEST_ASSERT_EQUAL_INT(2342 / (_9P_MSIZE - _9P_IOHDRSIZ) + 1, st.st_blocks);
-
-	TEST_ASSERT_EQUAL_STRING("testfile", (char*)f.path);
 }
 
 static void
@@ -458,8 +452,6 @@ test_9p__rwalk_success(void)
 	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
 	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
 	TEST_ASSERT_EQUAL_INT(1337, f->qid.path);
-
-	TEST_ASSERT_EQUAL_STRING("foo/bar", (char*)f->path);
 }
 
 static void
@@ -478,8 +470,7 @@ test_9p__rwalk_path_too_long(void)
 	char *path;
 
 	path = "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17";
-	TEST_ASSERT_EQUAL_INT(-EINVAL, _9pwalk(&f, path));
-
+	TEST_ASSERT_EQUAL_INT(-ENAMETOOLONG, _9pwalk(&f, path));
 }
 
 static void
