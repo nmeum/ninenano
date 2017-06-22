@@ -28,4 +28,7 @@ USEMODULE += ps
 # Module required for unit test functions
 USEMODULE += embunit
 
+# Module required for virtual file system layer
+USEMODULE += vfs
+
 include $(RIOTBASE)/Makefile.include

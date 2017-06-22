@@ -6,6 +6,8 @@
 #include <sys/types.h>
 
 #include "9p.h"
+#include "vfs.h"
+#include "9pfs.h"
 #include "xtimer.h"
 
 #include "lwip.h"
@@ -43,76 +45,150 @@ enum {
 static sock_tcp_ep_t remote = SOCK_IPV6_EP_ANY;
 
 /**
- * Rootfid newly initialized for each test.
+ * Mount point where the 9pfs is mounted.
  */
-static _9pfid *rootfid;
+static vfs_mount_t mountp;
 
 static void
 set_up(void)
 {
-	if (_9pinit(&remote))
-		TEST_FAIL("_9pinit failed");
+	memset(&mountp, '\0', sizeof(vfs_mount_t));
 
-	TEST_ASSERT_EQUAL_INT(0, _9pversion());
-	TEST_ASSERT_EQUAL_INT(0, _9pattach(&rootfid, "test", NULL));
+	mountp.mount_point = "/mnt";
+	mountp.fs = &_9p_file_system;
+	mountp.private_data = &remote;
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_mount(&mountp));
 }
 
 static void
 tear_down(void)
 {
-	_9pclose();
+	TEST_ASSERT_EQUAL_INT(0, vfs_umount(&mountp));
+}
+
+static void
+test_9pfs__create_and_remove_directory(void)
+{
+	struct stat st;
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_mkdir("/mnt/foo/wtf", 777));
+	TEST_ASSERT_EQUAL_INT(0, vfs_rmdir("/mnt/foo/wtf"));
+
+	TEST_ASSERT(vfs_stat("/mnt/foo/wtf", &st) != 0);
 }
 
 static void
 test_9pfs__read(void)
 {
-	size_t n;
-	_9pfid *fid;
+	int fd;
+	ssize_t n;
 	char dest[MAXSIZ];
 
-	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "foo/bar/hello"));
-	TEST_ASSERT_EQUAL_INT(0, _9popen(fid, OREAD));
+	fd = vfs_open("/mnt/foo/bar/hello", OREAD, 644);
+	TEST_ASSERT(fd >= 0);
 
-	n = _9pread(fid, dest, MAXSIZ - 1);
-	TEST_ASSERT_EQUAL_INT(n, 13);
+	n = vfs_read(fd, dest, MAXSIZ - 1);
+	TEST_ASSERT_EQUAL_INT(13, n);
 
 	dest[n] = '\0';
 	TEST_ASSERT_EQUAL_STRING("Hello World!\n", (char*)dest);
 
-	TEST_ASSERT_EQUAL_INT(0, _9pclunk(fid));
+	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
+}
+
+static void
+test_9pfs__lseek_and_read(void)
+{
+	int fd;
+	ssize_t n;
+	char dest[MAXSIZ];
+
+	fd = vfs_open("/mnt/foo/bar/hello", OREAD, 644);
+	TEST_ASSERT(fd >= 0);
+
+	TEST_ASSERT_EQUAL_INT(6, vfs_lseek(fd, 6, SEEK_SET));
+
+	n = vfs_read(fd, dest, MAXSIZ - 1);
+	TEST_ASSERT_EQUAL_INT(7, n);
+
+	dest[n] = '\0';
+	TEST_ASSERT_EQUAL_STRING("World!\n", (char*)dest);
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
 }
 
 static void
 test_9pfs_create_and_delete(void)
 {
-	_9pfid *fid;
+	int fd;
+	struct stat buf;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "foo"));
-	TEST_ASSERT_EQUAL_INT(0, _9pcreate(fid, "falafel", ORDWR, OTRUNC));
+	fd = vfs_open("/mnt/foo/falafel", O_RDWR|O_CREAT, 644);
+	TEST_ASSERT(fd >= 0);
 
-	TEST_ASSERT_EQUAL_INT(0, _9premove(fid));
-	TEST_ASSERT(_9pwalk(&fid, "foo/falafel") != 0); /* TODO better check. */
+	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
+	TEST_ASSERT_EQUAL_INT(0, vfs_unlink("/mnt/foo/falafel"));
+
+	TEST_ASSERT(vfs_stat("/mnt/foo/falafel", &buf) < 0);
 }
 
 static void
-test_9pfs__write(void)
+test_9pfs__write_lseek_and_read(void)
 {
-	_9pfid *fid;
+	int fd;
+	ssize_t n;
 	char *str = "foobar";
 	char dest[7];
-	size_t n;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "writeme"));
-	TEST_ASSERT_EQUAL_INT(0, _9popen(fid, ORDWR|OTRUNC));
+	fd = vfs_open("/mnt/writeme", O_RDWR|O_TRUNC, 644);
+	TEST_ASSERT(fd >= 0);
 
-	n = _9pwrite(fid, str, 6);
+	n = vfs_write(fd, str, 6);
 	TEST_ASSERT_EQUAL_INT(6, n);
 
-	n = _9pread(fid, dest, 6);
-	dest[6] = '\0';
+	TEST_ASSERT_EQUAL_INT(0, vfs_lseek(fd, 0, SEEK_SET));
 
+	n = vfs_read(fd, dest, 6);
+	TEST_ASSERT_EQUAL_INT(6, n);
+
+	dest[6] = '\0';
 	TEST_ASSERT_EQUAL_STRING(str, (char*)dest);
-	TEST_ASSERT_EQUAL_INT(0, _9pclunk(fid));
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
+}
+
+static void
+test_9pfs__opendir_and_closedir(void)
+{
+	vfs_DIR dirp;
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_opendir(&dirp, "/mnt/foo"));
+	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
+}
+
+static void
+test_9pfs__opendir_file(void)
+{
+	vfs_DIR dirp;
+
+	TEST_ASSERT_EQUAL_INT(-ENOTDIR,
+		vfs_opendir(&dirp, "/mnt/foo/bar/hello"));
+}
+
+static void
+test_9pfs__readdir(void)
+{
+	vfs_DIR dirp;
+	vfs_dirent_t entry;
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_opendir(&dirp, "/mnt/foo"));
+	TEST_ASSERT_EQUAL_INT(0, vfs_readdir(&dirp, &entry));
+	TEST_ASSERT_EQUAL_STRING("bar", (char*)entry.d_name);
+	/* TEST_ASSERT_EQUAL_INT(1, vfs_readdir(&dirp, &entry)); */
+
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
 }
 
 Test*
@@ -120,8 +196,13 @@ tests_9pfs_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9pfs__read),
+		new_TestFixture(test_9pfs__lseek_and_read),
 		new_TestFixture(test_9pfs_create_and_delete),
-		new_TestFixture(test_9pfs__write),
+		new_TestFixture(test_9pfs__write_lseek_and_read),
+		new_TestFixture(test_9pfs__create_and_remove_directory),
+		new_TestFixture(test_9pfs__opendir_and_closedir),
+		new_TestFixture(test_9pfs__opendir_file),
+		new_TestFixture(test_9pfs__readdir),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
