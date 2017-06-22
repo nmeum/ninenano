@@ -56,6 +56,7 @@ _9pfid fids[_9P_MAXFIDS];
 
 /**
  * @defgroup Static utility functions.
+ *
  * @{
  */
 

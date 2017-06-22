@@ -337,6 +337,7 @@ hstring(char *dest, uint16_t n, _9ppkt *pkt)
 
 /**
  * @defgroup Functions for converting qids.
+ *
  * @{
  */
 
