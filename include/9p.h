@@ -109,11 +109,11 @@ enum {
 	_9P_IOHDRSIZ = 24,
 
 	/**
-	 * Size of the machine-independent directory entry, stat. This
-	 * includes the leading 16-bit count. See stat(5) for more
-	 * information.
+	 * Minimum size of the machine-independent directory entry,
+	 * stat. This includes the leading 16-bit count. See stat(5) for
+	 * more information.
 	 */
-	_9P_STATSIZ = BIT16SZ + _9P_QIDSIZ + 5 * BIT16SZ + 4 * BIT32SZ + BIT64SZ,
+	_9P_STATSIZ = 3 * BIT16SZ + BIT32SZ + _9P_QIDSIZ + 3 * BIT32SZ + BIT64SZ + 4 * BIT16SZ,
 
 	/**
 	 * Maximum length of a version string in a R-message. The
