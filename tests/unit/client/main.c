@@ -455,6 +455,17 @@ test_9p__rwalk_success(void)
 }
 
 static void
+test_9p__rwalk_rootfid(void)
+{
+	_9pfid *f;
+
+	setcmd("rwalk_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&f, "/"));
+
+	TEST_ASSERT(f->fid != _9P_ROOTFID);
+}
+
+static void
 test_9p__rwalk_invalid_len(void)
 {
 	_9pfid *f;
@@ -559,6 +570,7 @@ test_9p__rread_count_zero(void)
 	setcmd("rread_count_zero\n");
 
 	f.fid = 42;
+	f.off = 0;
 	f.iounit = 1337;
 
 	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 10));
@@ -674,6 +686,7 @@ tests_9p_tests(void)
 		new_TestFixture(test_9p__rstat_success),
 
 		new_TestFixture(test_9p__rwalk_success),
+		new_TestFixture(test_9p__rwalk_rootfid),
 		new_TestFixture(test_9p__rwalk_invalid_len),
 		new_TestFixture(test_9p__rwalk_path_too_long),
 		new_TestFixture(test_9p__rwalk_nwqid_too_large),

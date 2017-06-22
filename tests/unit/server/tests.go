@@ -347,10 +347,12 @@ func RwalkSuccess(b *bytes.Buffer) error {
 		qids = append(qids, q)
 	}
 
-	qids[plen-1] = protocol.QID{
-		Path:    1337,
-		Type:    23,
-		Version: 42,
+	if plen > 0 {
+		qids[plen-1] = protocol.QID{
+			Path:    1337,
+			Type:    23,
+			Version: 42,
+		}
 	}
 
 	protocol.MarshalRwalkPkt(b, t, qids)

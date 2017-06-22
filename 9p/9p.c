@@ -663,9 +663,10 @@ _9pwalk(_9pfid **dest, char *path)
 	_9ppkt pkt;
 
 	if (*path == '\0' || !strcmp(path, "/"))
-		return -EINVAL; /* TODO */
+		len = 0;
+	else
+		len = strlen(path);
 
-	len = strlen(path);
 	if (!(fid = newfid()))
 		return -ENFILE;
 
