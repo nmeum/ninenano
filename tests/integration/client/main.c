@@ -28,7 +28,7 @@
  */
 #define GETENV(VAR, ENV) \
 	do { if (!(VAR = getenv(ENV))) { \
-		printf("%s is not set or empty\n", ENV); \
+		fprintf(stderr, "%s is not set or empty\n", ENV); \
 		return EXIT_FAILURE; } \
 	} while (0)
 
@@ -52,19 +52,25 @@ static vfs_mount_t mountp;
 static void
 set_up(void)
 {
+	int ret;
+
 	memset(&mountp, '\0', sizeof(vfs_mount_t));
 
 	mountp.mount_point = "/mnt";
 	mountp.fs = &_9p_file_system;
 	mountp.private_data = &remote;
 
-	TEST_ASSERT_EQUAL_INT(0, vfs_mount(&mountp));
+	if ((ret = vfs_mount(&mountp)))
+		fprintf(stderr, "vfs_mount failed: %d\n", ret);
 }
 
 static void
 tear_down(void)
 {
-	TEST_ASSERT_EQUAL_INT(0, vfs_umount(&mountp));
+	int ret;
+
+	if ((ret = vfs_umount(&mountp)))
+		fprintf(stderr, "vfs_umount failed: %d\n", ret);
 }
 
 static void
@@ -237,7 +243,10 @@ main(void)
 	GETENV(port, "NINERIOT_PPORT");
 
 	remote.port = atoi(port);
-	ipv6_addr_from_str((ipv6_addr_t *)&remote.addr, addr);
+	if (!ipv6_addr_from_str((ipv6_addr_t *)&remote.addr, addr)) {
+		fprintf(stderr, "Address '%s' is malformed\n", addr);
+		return EXIT_FAILURE;
+	}
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);

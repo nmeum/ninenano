@@ -26,7 +26,7 @@
  */
 #define GETENV(VAR, ENV) \
 	do { if (!(VAR = getenv(ENV))) { \
-		printf("%s is not set or empty\n", ENV); \
+		fprintf(stderr, "%s is not set or empty\n", ENV); \
 		return EXIT_FAILURE; } \
 	} while (0)
 
@@ -62,6 +62,7 @@ set_up(void)
 
 /**
  * @defgroup Tests for utility functios from `9p/util.c`.
+ *
  * @{
  */
 
@@ -726,8 +727,12 @@ main(void)
 	xtimer_sleep(3);
 
 	GETENV(addr, "NINERIOT_ADDR");
-	ipv6_addr_from_str((ipv6_addr_t*)&cr.addr, addr);
-	ipv6_addr_from_str((ipv6_addr_t*)&pr.addr, addr);
+
+	if (!ipv6_addr_from_str((ipv6_addr_t*)&cr.addr, addr)
+			|| !ipv6_addr_from_str((ipv6_addr_t*)&pr.addr, addr)) {
+		fprintf(stderr, "Address '%s' is malformed\n", addr);
+		return EXIT_FAILURE;
+	}
 
 	GETENV(pport, "NINERIOT_PPORT");
 	GETENV(cport, "NINERIOT_CPORT");
