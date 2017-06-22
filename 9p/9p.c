@@ -282,6 +282,7 @@ newfile(_9pfid *f, _9ppkt *pkt)
 	if (!f->iounit)
 		f->iounit = msize - _9P_IOHDRSIZ;
 
+	f->off = 0;
 	return 0;
 }
 
@@ -297,14 +298,12 @@ newfile(_9pfid *f, _9ppkt *pkt)
  * 	performed.
  * @param buf Pointer to a buffer from which data should be written to
  * 	or written from.
- * @param off Offset in the file at which the write/read operation
- * 	should begin.
  * @param count Amount of bytes that should be written or read from the
  * 	file.
  * @param t Type of the operation which should be performed.
  */
 static int
-ioloop(_9pfid *f, char *buf, uint64_t off, size_t count, _9ptype t)
+ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 {
 	int r;
 	size_t n;
@@ -321,7 +320,7 @@ ioloop(_9pfid *f, char *buf, uint64_t off, size_t count, _9ptype t)
 		 */
 		newpkt(&pkt, t);
 		htop32(f->fid, &pkt);
-		htop64(off, &pkt);
+		htop64(f->off, &pkt);
 
 		if (count - n <= UINT32_MAX)
 			pcnt = count - n;
@@ -340,7 +339,7 @@ ioloop(_9pfid *f, char *buf, uint64_t off, size_t count, _9ptype t)
 		}
 
 		DEBUG("Sending %s with offset %llu and count %zu\n",
-			(t == Tread) ? "Tread" : "Twrite", off, pcnt);
+			(t == Tread) ? "Tread" : "Twrite", f->off, pcnt);
 
 		if ((r = do9p(&pkt)))
 			return r;
@@ -372,7 +371,7 @@ ioloop(_9pfid *f, char *buf, uint64_t off, size_t count, _9ptype t)
 		}
 
 		n += pcnt;
-		off += pcnt;
+		f->off += pcnt;
 
 		if (pcnt < ocnt)
 			break;
@@ -836,15 +835,14 @@ _9pcreate(_9pfid *f, char *name, int perm, int flags)
  * @param f Fid from which data should be read.
  * @param dest Pointer to a buffer to which the received data should be
  * 	written.
- * @param off Offset at which the first byte should be read.
  * @param count Amount of data that should be read.
  * @return The number of bytes read on success or a negative errno on
  * 	error.
  */
 inline ssize_t
-_9pread(_9pfid *f, char *dest, uint64_t off, size_t count)
+_9pread(_9pfid *f, char *dest, size_t count)
 {
-	return ioloop(f, dest, off, count, Tread);
+	return ioloop(f, dest, count, Tread);
 }
 
 /**
@@ -856,15 +854,14 @@ _9pread(_9pfid *f, char *dest, uint64_t off, size_t count)
  * @param f Pointer to the fid to which data should be written.
  * @param src Pointer to a buffer containing the data which should be
  * 	written to the file.
- * @param off Offset at which the first byte should be written.
  * @param count Amount of bytes which should be written to the file
  * @return The number of bytes read on success or a negative errno on
  * 	error.
  */
 ssize_t
-_9pwrite(_9pfid *f, char *src, uint64_t off, size_t count)
+_9pwrite(_9pfid *f, char *src, size_t count)
 {
-	return ioloop(f, src, off, count, Twrite);
+	return ioloop(f, src, count, Twrite);
 }
 
 /**

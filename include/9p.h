@@ -299,6 +299,11 @@ typedef struct {
 	_9pqid qid;
 
 	/**
+	 * Offset in file associated with this fid.
+	 */
+	uint64_t off;
+
+	/**
 	 * iounit for this file as returned by open(5).
 	 */
 	uint32_t iounit;
@@ -347,8 +352,8 @@ int _9pstat(_9pfid*, struct stat*);
 int _9pwalk(_9pfid**, char*);
 int _9popen(_9pfid*, int);
 int _9pcreate(_9pfid*, char*, int, int);
-int _9pread(_9pfid*, char*, uint64_t, size_t);
-int _9pwrite(_9pfid*, char*, uint64_t, size_t);
+int _9pread(_9pfid*, char*, size_t);
+int _9pwrite(_9pfid*, char*, size_t);
 int _9premove(_9pfid*);
 
 void advbuf(_9ppkt*, size_t);

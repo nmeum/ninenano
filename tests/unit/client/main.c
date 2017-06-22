@@ -516,9 +516,10 @@ test_9p__rread_success(void)
 	setcmd("rread_success\n");
 
 	f.fid = 42;
+	f.off = 0;
 	f.iounit = 50;
 
-	ret = _9pread(&f, dest, 0, 6);
+	ret = _9pread(&f, dest, 6);
 	TEST_ASSERT_EQUAL_INT(6, ret);
 
 	dest[ret] = '\0';
@@ -539,9 +540,10 @@ test_9p__rread_with_offset(void)
 	setcmd("rread_with_offset\n");
 
 	f.fid = 23;
+	f.off = 0;
 	f.iounit = 5;
 
-	ret = _9pread(&f, dest, 0, 10);
+	ret = _9pread(&f, dest, 10);
 	TEST_ASSERT_EQUAL_INT(10, ret);
 
 	dest[ret] = '\0';
@@ -559,7 +561,7 @@ test_9p__rread_count_zero(void)
 	f.fid = 42;
 	f.iounit = 1337;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 0, 10));
+	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 10));
 }
 
 static void
@@ -572,9 +574,10 @@ test_9p__rread_with_larger_count(void)
 	setcmd("rread_success\n");
 
 	f.fid = 5;
+	f.off = 0;
 	f.iounit = 100;
 
-	ret = _9pread(&f, dest, 0, 100);
+	ret = _9pread(&f, dest, 100);
 	TEST_ASSERT_EQUAL_INT(6, ret);
 
 	dest[ret] = '\0';
@@ -594,7 +597,7 @@ test_9p__rwrite_success(void)
 	f.iounit = 50;
 
 	l = strlen(str);
-	TEST_ASSERT_EQUAL_INT(l, _9pwrite(&f, str, 0, l));
+	TEST_ASSERT_EQUAL_INT(l, _9pwrite(&f, str, l));
 
 }
 
