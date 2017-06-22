@@ -169,7 +169,23 @@ enum {
 #define DMDIR    0x80000000 /**< Mode bit for directories. */
 #define DMAPPEND 0x40000000 /**< Mode bit for append only files. */
 #define DMEXCL   0x20000000 /**< Mode bit for exclusive use files. */
-#define DMTMP    0x04000000 /**< Mode bit for non-backed-up file. */
+#define DMMOUNT  0x10000000 /**< Mode bit for mounted channel. */
+#define DMAUTH   0x08000000 /**< Mode bit for authentication file. */
+#define DMTMP    0x04000000 /**< Mode bit for non-backed-up files. */
+#define DMREAD   0x4        /**< Mode bit for read permission. */
+#define DMWRITE  0x2        /**< Mode bit for write permission. */
+#define DMEXEC   0x1        /**< Mode bit for execute permission. */
+
+/**
+ * Same bits as defined above for Qid.type.
+ */
+#define QTDIR    0x80 /* Type bit for directories. */
+#define QTAPPEND 0x40 /* Type bit for append only files. */
+#define QTEXCL   0x20 /* Type bit for exclusive use files. */
+#define QTMOUNT  0x10 /* Type bit for mounted channel. */
+#define QTAUTH   0x08 /* Type bit for authentication file. */
+#define QTTMP    0x04 /* Type bit for not-backed-up file. */
+#define QTFILE   0x00 /* Plain file. */
 
 /* From open(5):
  *   The mode field determines the type of I/O: 0 (called OREAD in
