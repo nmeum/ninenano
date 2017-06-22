@@ -15,7 +15,6 @@ static int _9pfs_unlink(vfs_mount_t *mountp, const char *name);
 static int _9pfs_mkdir(vfs_mount_t *mountp, const char *name, mode_t mode);
 static int _9pfs_rmdir(vfs_mount_t *mountp, const char *name);
 static int _9pfs_stat(vfs_mount_t *mountp, const char *restrict name, struct stat *restrict buf);
-/* static int _9pfs_statvfs(vfs_mount_t *mountp, const char *restrict path, struct statvfs *restrict buf); */
 
 /* File operations */
 static int _9pfs_close(vfs_file_t *filp);
@@ -37,6 +36,7 @@ static const vfs_file_system_ops_t _9pfs_fs_ops = {
 	.mkdir = _9pfs_mkdir,
 	.rmdir = _9pfs_rmdir,
 	.stat = _9pfs_stat,
+	.statvfs = NULL,
 };
 
 static const vfs_file_ops_t _9pfs_file_ops = {
@@ -213,7 +213,7 @@ static off_t _9pfs_lseek(vfs_file_t *filp, off_t off, int whence)
 		case SEEK_SET:
 			break;
 		case SEEK_CUR:
-			off += filp->pos;
+			off += f->off;
 			break;
 		case SEEK_END:
 			if (_9pstat(f, &st))
@@ -228,7 +228,7 @@ static off_t _9pfs_lseek(vfs_file_t *filp, off_t off, int whence)
 	if (off < 0)
 		return -EINVAL;
 
-	filp->pos = off;
+	f->off = off;
 	return off;
 }
 
@@ -282,9 +282,8 @@ _9pfs_read(vfs_file_t *filp, void *dest, size_t nbytes)
 
 	f = filp->private_data.ptr;
 
-	if ((ret = _9pread(f, dest, filp->pos, nbytes)) < 0)
+	if ((ret = _9pread(f, dest, nbytes)) < 0)
 		return -EIO;
-	filp->pos += ret;
 
 	return ret;
 }
@@ -297,9 +296,8 @@ _9pfs_write(vfs_file_t *filp, const void *src, size_t nbytes)
 
 	f = filp->private_data.ptr;
 
-	if ((ret = _9pwrite(f, (void*)src, filp->pos, nbytes)) < 0)
+	if ((ret = _9pwrite(f, (void*)src, nbytes)) < 0)
 		return -EIO;
-	filp->pos += ret;
 
 	return ret;
 }
@@ -338,21 +336,21 @@ _9pfs_readdir(vfs_DIR *dirp, vfs_dirent_t *entry)
 
 	f = dirp->private_data.ptr;
 
-	if ((n = _9pread(f, dest, 0, sizeof(dest))) < 0)
+	if ((n = _9pread(f, dest, sizeof(dest))) < 0)
 		return -EIO;
 	else if (n == 0)
-		return 1;
+		return 0;
 
 	pkt.len = n;
-	pkt.buf = (uint8_t*)dest;
+	pkt.buf = (unsigned char*)dest;
 
 	/* Skip all the information we don't need. */
 	advbuf(&pkt, 2 * BIT16SZ + BIT32SZ + _9P_QIDSIZ + 3 * BIT32SZ + BIT64SZ);
 	if (hstring(entry->d_name, sizeof(entry->d_name), &pkt))
 		return -EIO;
 
-	entry->d_ino = 0; /* TODO */
-	return 0;
+	entry->d_ino = 0; /* XXX */
+	return 1;
 }
 
 static int

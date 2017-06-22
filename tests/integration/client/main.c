@@ -177,16 +177,34 @@ test_9pfs__opendir_file(void)
 }
 
 static void
-test_9pfs__readdir(void)
+test_9pfs__readdir_single_entry(void)
 {
 	vfs_DIR dirp;
 	vfs_dirent_t entry;
 
 	TEST_ASSERT_EQUAL_INT(0, vfs_opendir(&dirp, "/mnt/foo"));
-	TEST_ASSERT_EQUAL_INT(0, vfs_readdir(&dirp, &entry));
+	TEST_ASSERT_EQUAL_INT(1, vfs_readdir(&dirp, &entry));
 	TEST_ASSERT_EQUAL_STRING("bar", (char*)entry.d_name);
-	/* TEST_ASSERT_EQUAL_INT(1, vfs_readdir(&dirp, &entry)); */
+	TEST_ASSERT_EQUAL_INT(0, vfs_readdir(&dirp, &entry));
 
+	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
+}
+
+static void
+test_9pfs__readdir_multiple_entries(void)
+{
+	int i;
+	vfs_DIR dirp;
+	vfs_dirent_t entry;
+	char dirname[VFS_NAME_MAX + 1];
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_opendir(&dirp, "/mnt/dirs"));
+	for (i = 1; i <= 5; i++) {
+		TEST_ASSERT_EQUAL_INT(1, vfs_readdir(&dirp, &entry));
+		snprintf(dirname, sizeof(dirname), "%d", i);
+		TEST_ASSERT_EQUAL_STRING((char*)dirname, (char*)entry.d_name);
+	}
+	TEST_ASSERT_EQUAL_INT(0, vfs_readdir(&dirp, &entry));
 
 	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
 }
@@ -202,7 +220,8 @@ tests_9pfs_tests(void)
 		new_TestFixture(test_9pfs__create_and_remove_directory),
 		new_TestFixture(test_9pfs__opendir_and_closedir),
 		new_TestFixture(test_9pfs__opendir_file),
-		new_TestFixture(test_9pfs__readdir),
+		new_TestFixture(test_9pfs__readdir_single_entry),
+		new_TestFixture(test_9pfs__readdir_multiple_entries),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
