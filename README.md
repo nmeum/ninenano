@@ -45,8 +45,9 @@ After creating the tun devices you can run the tests:
 Roadmap
 =======
 
-Refactor existing code:
-
+* [ ] Implement vfs_rename
+* [ ] Allow more than one connection
+* [ ] Abstraction to allow different transport layers
 * [ ] Better error handling (parse Rerror messages)
 * [ ] Simplify `_fibtbl` function
 * [x] Better error codes for _9pattach and _9pwalk
@@ -54,14 +55,8 @@ Refactor existing code:
 * [ ] More DEBUG calls
 * [x] Only do certain checks when compiled with -DDDEVHELP + assert(3)
 * [x] Better errno return values to differentiate paths in unit tests
-* [ ] 9pfs VFS layer
+* [x] 9pfs VFS layer
 * [ ] Refactor Documentation
-
-Implement missing message types:
-
-* [x] Tcreate
-* [x] Twrite
-* [ ] Twstat
 
 License
 =======
