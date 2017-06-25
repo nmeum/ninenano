@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "9pfs.h"
+#include "9p.h"
 #include "xtimer.h"
 
 #include "lwip.h"
@@ -26,7 +26,7 @@
  */
 #define GETENV(VAR, ENV) \
 	do { if (!(VAR = getenv(ENV))) { \
-		printf("%s is not set or empty\n", ENV); \
+		fprintf(stderr, "%s is not set or empty\n", ENV); \
 		return EXIT_FAILURE; } \
 	} while (0)
 
@@ -61,7 +61,8 @@ set_up(void)
 }
 
 /**
- * @defgroup Tests for utility functios from `9pfs/util.c`.
+ * @defgroup Tests for utility functios from `9p/util.c`.
+ *
  * @{
  */
 
@@ -218,13 +219,11 @@ test_9putil_fidtbl_get(void)
 
 	f1 = fidtbl(42, ADD);
 	f1->fid = 42;
-	strcpy(f1->path, "foobar");
 
 	f2 = fidtbl(42, GET);
 
 	TEST_ASSERT_NOT_NULL(f2);
 	TEST_ASSERT_EQUAL_INT(42, f2->fid);
-	TEST_ASSERT_EQUAL_STRING("foobar", (char*)f2->path);
 }
 
 static void
@@ -293,7 +292,7 @@ tests_9putil_tests(void)
 /**@}*/
 
 /**
- * @defgroup Tests for protocol functions from `9pfs/9p.c`.
+ * @defgroup Tests for protocol functions from `9p/9p.c`.
  *
  * You might be wondering why there are no comments below this points.
  * This is the case because the purpose of the various test cases is
@@ -305,110 +304,108 @@ tests_9putil_tests(void)
  */
 
 static void
-test_9pfs__header_too_short1(void)
+test_9p__header_too_short1(void)
 {
-	setcmd("test_9pfs__header_too_short1\n");
+	setcmd("test_9p__header_too_short1\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_too_short2(void)
+test_9p__header_too_short2(void)
 {
-	setcmd("test_9pfs__header_too_short2\n");
+	setcmd("test_9p__header_too_short2\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_too_large(void)
+test_9p__header_too_large(void)
 {
 	setcmd("header_too_large\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_wrong_type(void)
+test_9p__header_wrong_type(void)
 {
 	setcmd("header_wrong_type\n");
 	TEST_ASSERT_EQUAL_INT(-ENOTSUP, _9pversion());
 }
 
 static void
-test_9pfs__header_invalid_type(void)
+test_9p__header_invalid_type(void)
 {
 	setcmd("header_invalid_type\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_tag_mismatch(void)
+test_9p__header_tag_mismatch(void)
 {
 	setcmd("header_tag_mismatch\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__header_type_mismatch(void)
+test_9p__header_type_mismatch(void)
 {
 	setcmd("header_type_mismatch\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__rversion_success(void)
+test_9p__rversion_success(void)
 {
 	setcmd("rversion_success\n");
 	TEST_ASSERT_EQUAL_INT(0, _9pversion());
 }
 
 static void
-test_9pfs__rversion_unknown(void)
+test_9p__rversion_unknown(void)
 {
 	setcmd("rversion_unknown\n");
 	TEST_ASSERT_EQUAL_INT(-ENOPROTOOPT, _9pversion());
 }
 
 static void
-test_9pfs__rversion_msize_too_big(void)
+test_9p__rversion_msize_too_big(void)
 {
 	setcmd("rversion_msize_too_big\n");
 	TEST_ASSERT_EQUAL_INT(-EMSGSIZE, _9pversion());
 }
 
 static void
-test_9pfs__rversion_invalid(void)
+test_9p__rversion_invalid(void)
 {
 	setcmd("rversion_invalid\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__rversion_invalid_len(void)
+test_9p__rversion_invalid_len(void)
 {
 	setcmd("rversion_invalid_len\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__rversion_version_too_long(void)
+test_9p__rversion_version_too_long(void)
 {
 	setcmd("rversion_version_too_long\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
 }
 
 static void
-test_9pfs__rattach_success(void)
+test_9p__rattach_success(void)
 {
 	_9pfid *fid;
 
 	setcmd("rattach_success\n");
 	TEST_ASSERT_EQUAL_INT(0, _9pattach(&fid, "foo", NULL));
-
-	TEST_ASSERT_EQUAL_STRING("", (char*)fid->path);
 	TEST_ASSERT(fid->fid > 0);
 }
 
 static void
-test_9pfs__rattach_invalid_len(void)
+test_9p__rattach_invalid_len(void)
 {
 	_9pfid *fid;
 
@@ -417,7 +414,7 @@ test_9pfs__rattach_invalid_len(void)
 }
 
 static void
-test_9pfs__rstat_success(void)
+test_9p__rstat_success(void)
 {
 	_9pfid f;
 	struct stat st;
@@ -443,12 +440,10 @@ test_9pfs__rstat_success(void)
 	TEST_ASSERT_EQUAL_INT(0, st.st_gid);
 	TEST_ASSERT_EQUAL_INT(_9P_MSIZE - _9P_IOHDRSIZ, st.st_blksize);
 	TEST_ASSERT_EQUAL_INT(2342 / (_9P_MSIZE - _9P_IOHDRSIZ) + 1, st.st_blocks);
-
-	TEST_ASSERT_EQUAL_STRING("testfile", (char*)f.path);
 }
 
 static void
-test_9pfs__rwalk_success(void)
+test_9p__rwalk_success(void)
 {
 	_9pfid *f;
 
@@ -458,12 +453,21 @@ test_9pfs__rwalk_success(void)
 	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
 	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
 	TEST_ASSERT_EQUAL_INT(1337, f->qid.path);
-
-	TEST_ASSERT_EQUAL_STRING("foo/bar", (char*)f->path);
 }
 
 static void
-test_9pfs__rwalk_invalid_len(void)
+test_9p__rwalk_rootfid(void)
+{
+	_9pfid *f;
+
+	setcmd("rwalk_success\n");
+	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&f, "/"));
+
+	TEST_ASSERT(f->fid != _9P_ROOTFID);
+}
+
+static void
+test_9p__rwalk_invalid_len(void)
 {
 	_9pfid *f;
 
@@ -472,18 +476,17 @@ test_9pfs__rwalk_invalid_len(void)
 }
 
 static void
-test_9pfs__rwalk_path_too_long(void)
+test_9p__rwalk_path_too_long(void)
 {
 	_9pfid *f;
 	char *path;
 
 	path = "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17";
-	TEST_ASSERT_EQUAL_INT(-EINVAL, _9pwalk(&f, path));
-
+	TEST_ASSERT_EQUAL_INT(-ENAMETOOLONG, _9pwalk(&f, path));
 }
 
 static void
-test_9pfs__rwalk_nwqid_too_large(void)
+test_9p__rwalk_nwqid_too_large(void)
 {
 	_9pfid *f;
 
@@ -492,7 +495,7 @@ test_9pfs__rwalk_nwqid_too_large(void)
 }
 
 static void
-test_9pfs__ropen_success(void)
+test_9p__ropen_success(void)
 {
 	_9pfid f;
 
@@ -504,7 +507,7 @@ test_9pfs__ropen_success(void)
 }
 
 static void
-test_9pfs__rcreate_success(void)
+test_9p__rcreate_success(void)
 {
 	_9pfid f;
 
@@ -516,7 +519,7 @@ test_9pfs__rcreate_success(void)
 }
 
 static void
-test_9pfs__rread_success(void)
+test_9p__rread_success(void)
 {
 	_9pfid f;
 	ssize_t ret;
@@ -525,6 +528,7 @@ test_9pfs__rread_success(void)
 	setcmd("rread_success\n");
 
 	f.fid = 42;
+	f.off = 0;
 	f.iounit = 50;
 
 	ret = _9pread(&f, dest, 6);
@@ -535,7 +539,7 @@ test_9pfs__rread_success(void)
 }
 
 static void
-test_9pfs__rread_with_offset(void)
+test_9p__rread_with_offset(void)
 {
 	_9pfid f;
 	ssize_t ret;
@@ -548,6 +552,7 @@ test_9pfs__rread_with_offset(void)
 	setcmd("rread_with_offset\n");
 
 	f.fid = 23;
+	f.off = 0;
 	f.iounit = 5;
 
 	ret = _9pread(&f, dest, 10);
@@ -558,7 +563,7 @@ test_9pfs__rread_with_offset(void)
 }
 
 static void
-test_9pfs__rread_count_zero(void)
+test_9p__rread_count_zero(void)
 {
 	_9pfid f;
 	char dest[11];
@@ -566,13 +571,14 @@ test_9pfs__rread_count_zero(void)
 	setcmd("rread_count_zero\n");
 
 	f.fid = 42;
+	f.off = 0;
 	f.iounit = 1337;
 
-	TEST_ASSERT_EQUAL_INT(-EFBIG, _9pread(&f, dest, 10));
+	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 10));
 }
 
 static void
-test_9pfs__rread_with_larger_count(void)
+test_9p__rread_with_larger_count(void)
 {
 	_9pfid f;
 	ssize_t ret;
@@ -581,6 +587,7 @@ test_9pfs__rread_with_larger_count(void)
 	setcmd("rread_success\n");
 
 	f.fid = 5;
+	f.off = 0;
 	f.iounit = 100;
 
 	ret = _9pread(&f, dest, 100);
@@ -591,7 +598,7 @@ test_9pfs__rread_with_larger_count(void)
 }
 
 static void
-test_9pfs__rwrite_success(void)
+test_9p__rwrite_success(void)
 {
 	_9pfid f;
 	char *str = "hurrdurr";
@@ -608,7 +615,7 @@ test_9pfs__rwrite_success(void)
 }
 
 static void
-test_9pfs__rclunk_success(void)
+test_9p__rclunk_success(void)
 {
 	_9pfid *f;
 
@@ -621,7 +628,7 @@ test_9pfs__rclunk_success(void)
 }
 
 static void
-test_9pfs__rclunk_bad_fid(void)
+test_9p__rclunk_bad_fid(void)
 {
 	_9pfid f;
 
@@ -632,7 +639,7 @@ test_9pfs__rclunk_bad_fid(void)
 }
 
 static void
-test_9pfs__rremove_success(void)
+test_9p__rremove_success(void)
 {
 	_9pfid *f;
 
@@ -645,7 +652,7 @@ test_9pfs__rremove_success(void)
 }
 
 static void
-test_9pfs__rremove_bad_fid(void)
+test_9p__rremove_bad_fid(void)
 {
 	_9pfid f;
 
@@ -656,54 +663,55 @@ test_9pfs__rremove_bad_fid(void)
 }
 
 Test*
-tests_9pfs_tests(void)
+tests_9p_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
-		new_TestFixture(test_9pfs__header_too_short1),
-		new_TestFixture(test_9pfs__header_too_short2),
-		new_TestFixture(test_9pfs__header_too_large),
-		new_TestFixture(test_9pfs__header_wrong_type),
-		new_TestFixture(test_9pfs__header_invalid_type),
-		new_TestFixture(test_9pfs__header_tag_mismatch),
-		new_TestFixture(test_9pfs__header_type_mismatch),
+		new_TestFixture(test_9p__header_too_short1),
+		new_TestFixture(test_9p__header_too_short2),
+		new_TestFixture(test_9p__header_too_large),
+		new_TestFixture(test_9p__header_wrong_type),
+		new_TestFixture(test_9p__header_invalid_type),
+		new_TestFixture(test_9p__header_tag_mismatch),
+		new_TestFixture(test_9p__header_type_mismatch),
 
-		new_TestFixture(test_9pfs__rversion_success),
-		new_TestFixture(test_9pfs__rversion_unknown),
-		new_TestFixture(test_9pfs__rversion_msize_too_big),
-		new_TestFixture(test_9pfs__rversion_invalid),
-		new_TestFixture(test_9pfs__rversion_invalid_len),
-		new_TestFixture(test_9pfs__rversion_version_too_long),
+		new_TestFixture(test_9p__rversion_success),
+		new_TestFixture(test_9p__rversion_unknown),
+		new_TestFixture(test_9p__rversion_msize_too_big),
+		new_TestFixture(test_9p__rversion_invalid),
+		new_TestFixture(test_9p__rversion_invalid_len),
+		new_TestFixture(test_9p__rversion_version_too_long),
 
-		new_TestFixture(test_9pfs__rattach_success),
-		new_TestFixture(test_9pfs__rattach_invalid_len),
+		new_TestFixture(test_9p__rattach_success),
+		new_TestFixture(test_9p__rattach_invalid_len),
 
-		new_TestFixture(test_9pfs__rstat_success),
+		new_TestFixture(test_9p__rstat_success),
 
-		new_TestFixture(test_9pfs__rwalk_success),
-		new_TestFixture(test_9pfs__rwalk_invalid_len),
-		new_TestFixture(test_9pfs__rwalk_path_too_long),
-		new_TestFixture(test_9pfs__rwalk_nwqid_too_large),
+		new_TestFixture(test_9p__rwalk_success),
+		new_TestFixture(test_9p__rwalk_rootfid),
+		new_TestFixture(test_9p__rwalk_invalid_len),
+		new_TestFixture(test_9p__rwalk_path_too_long),
+		new_TestFixture(test_9p__rwalk_nwqid_too_large),
 
-		new_TestFixture(test_9pfs__ropen_success),
+		new_TestFixture(test_9p__ropen_success),
 
-		new_TestFixture(test_9pfs__rcreate_success),
+		new_TestFixture(test_9p__rcreate_success),
 
-		new_TestFixture(test_9pfs__rread_success),
-		new_TestFixture(test_9pfs__rread_with_offset),
-		new_TestFixture(test_9pfs__rread_count_zero),
-		new_TestFixture(test_9pfs__rread_with_larger_count),
+		new_TestFixture(test_9p__rread_success),
+		new_TestFixture(test_9p__rread_with_offset),
+		new_TestFixture(test_9p__rread_count_zero),
+		new_TestFixture(test_9p__rread_with_larger_count),
 
-		new_TestFixture(test_9pfs__rwrite_success),
+		new_TestFixture(test_9p__rwrite_success),
 
-		new_TestFixture(test_9pfs__rclunk_success),
-		new_TestFixture(test_9pfs__rclunk_bad_fid),
+		new_TestFixture(test_9p__rclunk_success),
+		new_TestFixture(test_9p__rclunk_bad_fid),
 
-		new_TestFixture(test_9pfs__rremove_success),
-		new_TestFixture(test_9pfs__rremove_bad_fid),
+		new_TestFixture(test_9p__rremove_success),
+		new_TestFixture(test_9p__rremove_bad_fid),
 	};
 
-	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
-	return (Test*)&_9pfs_tests;
+	EMB_UNIT_TESTCALLER(_9p_tests, set_up, tear_down, fixtures);
+	return (Test*)&_9p_tests;
 }
 
 /**@}*/
@@ -712,15 +720,19 @@ int
 main(void)
 {
 	char *addr, *cport, *pport;
-	static sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
-	static sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
+	sock_tcp_ep_t cr = SOCK_IPV6_EP_ANY;
+	sock_tcp_ep_t pr = SOCK_IPV6_EP_ANY;
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
 
 	GETENV(addr, "NINERIOT_ADDR");
-	ipv6_addr_from_str((ipv6_addr_t *)&cr.addr, addr);
-	ipv6_addr_from_str((ipv6_addr_t *)&pr.addr, addr);
+
+	if (!ipv6_addr_from_str((ipv6_addr_t*)&cr.addr, addr)
+			|| !ipv6_addr_from_str((ipv6_addr_t*)&pr.addr, addr)) {
+		fprintf(stderr, "Address '%s' is malformed\n", addr);
+		return EXIT_FAILURE;
+	}
 
 	GETENV(pport, "NINERIOT_PPORT");
 	GETENV(cport, "NINERIOT_CPORT");
@@ -733,14 +745,14 @@ main(void)
 		return EXIT_FAILURE;
 	}
 
-	if (_9pinit(pr)) {
+	if (_9pinit(&pr)) {
 		puts("_9pinit failed");
 		return EXIT_FAILURE;
 	}
 
 	TESTS_START();
 	TESTS_RUN(tests_9putil_tests());
-	TESTS_RUN(tests_9pfs_tests());
+	TESTS_RUN(tests_9p_tests());
 	TESTS_END();
 
 	sock_tcp_disconnect(&csock);

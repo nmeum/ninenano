@@ -3,6 +3,18 @@
 
 Implementation of the 9P protocol for the RIOT operating system.
 
+Usage
+=====
+
+9RIOT currently consists of two components:
+
+1. 9p: An implementation of the 9P network protocol
+2. 9pfs: Virtual 9P file system using RIOTs VFS layer
+
+When writing IoT application that utilize 9P as an application layer
+protocol it is probably sufficient to use the 9P component directly
+without the VFS layer.
+
 Documentation
 =============
 
@@ -10,6 +22,10 @@ TODO
 
 Tests
 =====
+
+9RIOT comes with both unit and integration tests. The unit tests use the
+9P component directly while the integration tests use 9P through the
+9pfs component.
 
 In order to run the tests you need to setup the toolchain for RIOTs
 [native family](1). Besides you need to install go >= 1.5, python 3.X
@@ -26,16 +42,12 @@ After creating the tun devices you can run the tests:
 	$ export TESTADDR="fe80::e42a:1aff:feca:10ec"
 	$ make test
 
-Usage
-=====
-
-TODO
-
 Roadmap
 =======
 
-Refactor existing code:
-
+* [ ] Implement vfs_rename
+* [ ] Allow more than one connection
+* [ ] Abstraction to allow different transport layers
 * [ ] Better error handling (parse Rerror messages)
 * [ ] Simplify `_fibtbl` function
 * [x] Better error codes for _9pattach and _9pwalk
@@ -43,14 +55,8 @@ Refactor existing code:
 * [ ] More DEBUG calls
 * [x] Only do certain checks when compiled with -DDDEVHELP + assert(3)
 * [x] Better errno return values to differentiate paths in unit tests
-* [ ] 9pfs VFS layer
+* [x] 9pfs VFS layer
 * [ ] Refactor Documentation
-
-Implement missing message types:
-
-* [x] Tcreate
-* [x] Twrite
-* [ ] Twstat
 
 License
 =======

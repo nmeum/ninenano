@@ -6,7 +6,7 @@
 
 #include "xtimer.h"
 #include "random.h"
-#include "9pfs.h"
+#include "9p.h"
 
 #define ENABLE_DEBUG (1)
 #include "debug.h"
@@ -56,6 +56,7 @@ _9pfid fids[_9P_MAXFIDS];
 
 /**
  * @defgroup Static utility functions.
+ *
  * @{
  */
 
@@ -282,6 +283,7 @@ newfile(_9pfid *f, _9ppkt *pkt)
 	if (!f->iounit)
 		f->iounit = msize - _9P_IOHDRSIZ;
 
+	f->off = 0;
 	return 0;
 }
 
@@ -319,7 +321,7 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		 */
 		newpkt(&pkt, t);
 		htop32(f->fid, &pkt);
-		htop64(n, &pkt);
+		htop64(f->off, &pkt);
 
 		if (count - n <= UINT32_MAX)
 			pcnt = count - n;
@@ -337,8 +339,8 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 			bufcpy(&pkt, &buf[n], pcnt);
 		}
 
-		DEBUG("Sending %s with offset %zu and count %zu\n",
-			(t == Tread) ? "Tread" : "Twrite", n, pcnt);
+		DEBUG("Sending %s with offset %llu and count %zu\n",
+			(t == Tread) ? "Tread" : "Twrite", f->off, pcnt);
 
 		if ((r = do9p(&pkt)))
 			return r;
@@ -358,7 +360,7 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		 *   be returned.
 		 */
 		if (!pcnt)
-			return -EFBIG;
+			return 0; /* EOF */
 
 		if (pcnt > count)
 			return -EBADMSG;
@@ -370,6 +372,8 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		}
 
 		n += pcnt;
+		f->off += pcnt;
+
 		if (pcnt < ocnt)
 			break;
 	}
@@ -384,18 +388,18 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
  * but it does not initiate the connection with the server. This has to
  * be done manually using the ::_9pversion and ::_9pattach functions.
  *
- * @param remote Remote address of the server to connect to.
+ * @param remote Pointer to TCP endpoint of the server to connect to.
  * @return `0` on success, on error a negative errno is returned.
  */
 int
-_9pinit(sock_tcp_ep_t remote)
+_9pinit(sock_tcp_ep_t *remote)
 {
 	int r;
 
 	random_init(xtimer_now().ticks32);
 
 	DEBUG("Connecting to TCP socket...\n");
-	if ((r = sock_tcp_connect(&sock, &remote, 0, SOCK_FLAGS_REUSE_EP)))
+	if ((r = sock_tcp_connect(&sock, remote, 0, SOCK_FLAGS_REUSE_EP)))
 		return r;
 
 	return 0;
@@ -537,8 +541,6 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
 		return -EBADMSG;
 	}
 
-	*fid->path = '\0'; /* empty string */
-
 	*dest = fid;
 	return 0;
 }
@@ -619,11 +621,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 	b->st_blksize = msize - _9P_IOHDRSIZ;
 	b->st_blocks = b->st_size / b->st_blksize + 1;
 
-	/* extract the file name and store it in the fid. */
-	if (hstring(fid->path, _9P_PTHMAX, &pkt))
-		return -EBADMSG;
-
-	/* uid, gid and muid are ignored. */
+	/* name, uid, gid and muid are ignored. */
 
 	return 0;
 }
@@ -666,11 +664,10 @@ _9pwalk(_9pfid **dest, char *path)
 	_9ppkt pkt;
 
 	if (*path == '\0' || !strcmp(path, "/"))
-		return -EINVAL; /* TODO */
+		len = 0;
+	else
+		len = strlen(path);
 
-	len = strlen(path);
-	if (len >= _9P_PTHMAX)
-		return -EINVAL;
 	if (!(fid = newfid()))
 		return -ENFILE;
 
@@ -742,9 +739,6 @@ _9pwalk(_9pfid **dest, char *path)
 		r = -EBADMSG;
 		goto err;
 	}
-
-	/* Copy string, overflow check is performed above. */
-	strcpy(fid->path, path);
 
 	*dest = fid;
 	return 0;

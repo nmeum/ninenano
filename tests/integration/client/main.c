@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "9p.h"
+#include "vfs.h"
 #include "9pfs.h"
 #include "xtimer.h"
 
@@ -26,7 +28,7 @@
  */
 #define GETENV(VAR, ENV) \
 	do { if (!(VAR = getenv(ENV))) { \
-		printf("%s is not set or empty\n", ENV); \
+		fprintf(stderr, "%s is not set or empty\n", ENV); \
 		return EXIT_FAILURE; } \
 	} while (0)
 
@@ -43,76 +45,174 @@ enum {
 static sock_tcp_ep_t remote = SOCK_IPV6_EP_ANY;
 
 /**
- * Rootfid newly initialized for each test.
+ * Mount point where the 9pfs is mounted.
  */
-static _9pfid *rootfid;
+static vfs_mount_t mountp;
 
 static void
 set_up(void)
 {
-	if (_9pinit(remote))
-		TEST_FAIL("_9pinit failed");
+	int ret;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pversion());
-	TEST_ASSERT_EQUAL_INT(0, _9pattach(&rootfid, "test", NULL));
+	memset(&mountp, '\0', sizeof(vfs_mount_t));
+
+	mountp.mount_point = "/mnt";
+	mountp.fs = &_9p_file_system;
+	mountp.private_data = &remote;
+
+	if ((ret = vfs_mount(&mountp)))
+		fprintf(stderr, "vfs_mount failed: %d\n", ret);
 }
 
 static void
 tear_down(void)
 {
-	_9pclose();
+	int ret;
+
+	if ((ret = vfs_umount(&mountp)))
+		fprintf(stderr, "vfs_umount failed: %d\n", ret);
+}
+
+static void
+test_9pfs__create_and_remove_directory(void)
+{
+	struct stat st;
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_mkdir("/mnt/foo/wtf", 777));
+	TEST_ASSERT_EQUAL_INT(0, vfs_rmdir("/mnt/foo/wtf"));
+
+	TEST_ASSERT(vfs_stat("/mnt/foo/wtf", &st) != 0);
 }
 
 static void
 test_9pfs__read(void)
 {
-	size_t n;
-	_9pfid *fid;
+	int fd;
+	ssize_t n;
 	char dest[MAXSIZ];
 
-	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "foo/bar/hello"));
-	TEST_ASSERT_EQUAL_INT(0, _9popen(fid, OREAD));
+	fd = vfs_open("/mnt/foo/bar/hello", OREAD, 644);
+	TEST_ASSERT(fd >= 0);
 
-	n = _9pread(fid, dest, MAXSIZ - 1);
-	TEST_ASSERT_EQUAL_INT(n, 13);
+	n = vfs_read(fd, dest, MAXSIZ - 1);
+	TEST_ASSERT_EQUAL_INT(13, n);
 
 	dest[n] = '\0';
 	TEST_ASSERT_EQUAL_STRING("Hello World!\n", (char*)dest);
 
-	TEST_ASSERT_EQUAL_INT(0, _9pclunk(fid));
+	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
+}
+
+static void
+test_9pfs__lseek_and_read(void)
+{
+	int fd;
+	ssize_t n;
+	char dest[MAXSIZ];
+
+	fd = vfs_open("/mnt/foo/bar/hello", OREAD, 644);
+	TEST_ASSERT(fd >= 0);
+
+	TEST_ASSERT_EQUAL_INT(6, vfs_lseek(fd, 6, SEEK_SET));
+
+	n = vfs_read(fd, dest, MAXSIZ - 1);
+	TEST_ASSERT_EQUAL_INT(7, n);
+
+	dest[n] = '\0';
+	TEST_ASSERT_EQUAL_STRING("World!\n", (char*)dest);
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
 }
 
 static void
 test_9pfs_create_and_delete(void)
 {
-	_9pfid *fid;
+	int fd;
+	struct stat buf;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "foo"));
-	TEST_ASSERT_EQUAL_INT(0, _9pcreate(fid, "falafel", ORDWR, OTRUNC));
+	fd = vfs_open("/mnt/foo/falafel", O_RDWR|O_CREAT, 644);
+	TEST_ASSERT(fd >= 0);
 
-	TEST_ASSERT_EQUAL_INT(0, _9premove(fid));
-	TEST_ASSERT(_9pwalk(&fid, "foo/falafel") != 0); /* TODO better check. */
+	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
+	TEST_ASSERT_EQUAL_INT(0, vfs_unlink("/mnt/foo/falafel"));
+
+	TEST_ASSERT(vfs_stat("/mnt/foo/falafel", &buf) < 0);
 }
 
 static void
-test_9pfs__write(void)
+test_9pfs__write_lseek_and_read(void)
 {
-	_9pfid *fid;
+	int fd;
+	ssize_t n;
 	char *str = "foobar";
 	char dest[7];
-	size_t n;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&fid, "writeme"));
-	TEST_ASSERT_EQUAL_INT(0, _9popen(fid, ORDWR|OTRUNC));
+	fd = vfs_open("/mnt/writeme", O_RDWR|O_TRUNC, 644);
+	TEST_ASSERT(fd >= 0);
 
-	n = _9pwrite(fid, str, 6);
+	n = vfs_write(fd, str, 6);
 	TEST_ASSERT_EQUAL_INT(6, n);
 
-	n = _9pread(fid, dest, 6);
-	dest[6] = '\0';
+	TEST_ASSERT_EQUAL_INT(0, vfs_lseek(fd, 0, SEEK_SET));
 
+	n = vfs_read(fd, dest, 6);
+	TEST_ASSERT_EQUAL_INT(6, n);
+
+	dest[6] = '\0';
 	TEST_ASSERT_EQUAL_STRING(str, (char*)dest);
-	TEST_ASSERT_EQUAL_INT(0, _9pclunk(fid));
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
+}
+
+static void
+test_9pfs__opendir_and_closedir(void)
+{
+	vfs_DIR dirp;
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_opendir(&dirp, "/mnt/foo"));
+	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
+}
+
+static void
+test_9pfs__opendir_file(void)
+{
+	vfs_DIR dirp;
+
+	TEST_ASSERT_EQUAL_INT(-ENOTDIR,
+		vfs_opendir(&dirp, "/mnt/foo/bar/hello"));
+}
+
+static void
+test_9pfs__readdir_single_entry(void)
+{
+	vfs_DIR dirp;
+	vfs_dirent_t entry;
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_opendir(&dirp, "/mnt/foo"));
+	TEST_ASSERT_EQUAL_INT(1, vfs_readdir(&dirp, &entry));
+	TEST_ASSERT_EQUAL_STRING("bar", (char*)entry.d_name);
+	TEST_ASSERT_EQUAL_INT(0, vfs_readdir(&dirp, &entry));
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
+}
+
+static void
+test_9pfs__readdir_multiple_entries(void)
+{
+	int i;
+	vfs_DIR dirp;
+	vfs_dirent_t entry;
+	char dirname[VFS_NAME_MAX + 1];
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_opendir(&dirp, "/mnt/dirs"));
+	for (i = 1; i <= 5; i++) {
+		TEST_ASSERT_EQUAL_INT(1, vfs_readdir(&dirp, &entry));
+		snprintf(dirname, sizeof(dirname), "%d", i);
+		TEST_ASSERT_EQUAL_STRING((char*)dirname, (char*)entry.d_name);
+	}
+	TEST_ASSERT_EQUAL_INT(0, vfs_readdir(&dirp, &entry));
+
+	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
 }
 
 Test*
@@ -120,8 +220,14 @@ tests_9pfs_tests(void)
 {
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9pfs__read),
+		new_TestFixture(test_9pfs__lseek_and_read),
 		new_TestFixture(test_9pfs_create_and_delete),
-		new_TestFixture(test_9pfs__write),
+		new_TestFixture(test_9pfs__write_lseek_and_read),
+		new_TestFixture(test_9pfs__create_and_remove_directory),
+		new_TestFixture(test_9pfs__opendir_and_closedir),
+		new_TestFixture(test_9pfs__opendir_file),
+		new_TestFixture(test_9pfs__readdir_single_entry),
+		new_TestFixture(test_9pfs__readdir_multiple_entries),
 	};
 
 	EMB_UNIT_TESTCALLER(_9pfs_tests, set_up, tear_down, fixtures);
@@ -137,7 +243,10 @@ main(void)
 	GETENV(port, "NINERIOT_PPORT");
 
 	remote.port = atoi(port);
-	ipv6_addr_from_str((ipv6_addr_t *)&remote.addr, addr);
+	if (!ipv6_addr_from_str((ipv6_addr_t *)&remote.addr, addr)) {
+		fprintf(stderr, "Address '%s' is malformed\n", addr);
+		return EXIT_FAILURE;
+	}
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);

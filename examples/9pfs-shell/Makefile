@@ -1,5 +1,5 @@
 # Name of your application
-APPLICATION = 9RIOT
+APPLICATION = 9pfs-shell
 
 # Run tests of native only
 BOARD = native
@@ -8,13 +8,12 @@ BOARD = native
 QUIET ?= 1
 
 # Path to the RIOT submodule
-RIOTBASE ?= $(CURDIR)/../../../vendor/RIOT
+RIOTBASE ?= $(CURDIR)/../../vendor/RIOT
 
-# CFLAGS for debugging purposes
-CFLAGS += -DDEVELHELP -ggdb
-
-# CFLAGS for configuration purposes
-CFLAGS += -DPORT=5555
+# Modules required for using the vfs shell commands
+USEMODULE += vfs
+USEMODULE += shell
+USEMODULE += shell_commands
 
 # Modules required for using sock_tcp
 USEMODULE += ipv6_addr
@@ -27,8 +26,5 @@ USEMODULE += ps
 
 # Module required for unit test functions
 USEMODULE += embunit
-
-# Module required for virtual file system layer
-USEMODULE += vfs
 
 include $(RIOTBASE)/Makefile.include
