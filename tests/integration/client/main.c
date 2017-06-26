@@ -259,5 +259,6 @@ main(void)
 	TESTS_RUN(tests_9pfs_tests());
 	TESTS_END();
 
+	sock_tcp_disconnect(&ctx.sock);
 	return EXIT_SUCCESS;
 }
