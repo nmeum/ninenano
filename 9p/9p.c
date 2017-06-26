@@ -12,49 +12,6 @@
 #include "debug.h"
 
 /**
- * Global static buffer used for storing message specific parameters.
- * Message indepented parameters are stored on the stack using `_9ppkt`.
- */
-static uint8_t buffer[_9P_MSIZE];
-
-/**
- * Global Sock TCP socket used for communicating with the 9P server.
- *
- * We use sock here to be independent of the underlying network stack.
- * Currently only the lwip network stack has support for socks's TCP API
- * but that will hopefully change in the future.
- */
-static sock_tcp_t sock;
-
-/**
- * From version(5):
- *   The client suggests a maximum message size, msize, that is the
- *   maximum length, in bytes, it will ever generate or expect to
- *   receive in a single 9P message.
- *
- * The msize we are suggestion to the server is defined by the macro
- * ::_9P_MSIZE for the unlikly event that the server choosen an msize
- * smaller than the one we are suggesting we are storing the msize
- * actually used for the communication in this variable.
- *
- * It is declared with the initial value ::_9P_MSIZE to make it possible
- * to use this variable as an argument to ::sock_tcp_read even before a
- * session is established.
- */
-static uint32_t msize = _9P_MSIZE;
-
-/**
- * As with file descriptors, we need to store currently open fids
- * somehow. This is done in this static buffer. This buffer should only
- * be accessed using the ::fidtbl function it should never be modified
- * directly.
- *
- * This buffer is not static because it is used in the ::fidtbl
- * function from `util.c`.
- */
-_9pfid fids[_9P_MAXFIDS];
-
-/**
  * @defgroup Static utility functions.
  *
  * @{
@@ -65,15 +22,16 @@ _9pfid fids[_9P_MAXFIDS];
  * to the amount of bytes still available in the buffer and should be
  * decremented when writing to the buffer.
  *
+ * @param ctx 9P connection context.
  * @param pkt Pointer to a packet for which the members should be
  * 	initialized.
  * @param type Type which should be used for this packet.
  */
 void
-newpkt(_9ppkt *pkt, _9ptype type)
+newpkt(_9pctx *ctx, _9ppkt *pkt, _9ptype type)
 {
-	pkt->buf = buffer + _9P_HEADSIZ;
-	pkt->len = msize - _9P_HEADSIZ;
+	pkt->buf = ctx->buffer + _9P_HEADSIZ;
+	pkt->len = ctx->msize - _9P_HEADSIZ;
 	pkt->type = type;
 }
 
@@ -87,6 +45,7 @@ newpkt(_9ppkt *pkt, _9ptype type)
  * the entire 9P message. Thus the message length will never exceed `2^32`
  * bytes.
  *
+ * @param ctx 9P connection context.
  * @param pkt Pointer to memory area to store result in.
  * @param buf Buffer containg the message which should be parsed.
  * @param buflen Total length of the given buffer.
@@ -97,12 +56,12 @@ newpkt(_9ppkt *pkt, _9ptype type)
  *   T-messages are not supported and yield this error code.
  */
 static int
-_9pheader(_9ppkt *pkt, uint32_t buflen)
+_9pheader(_9pctx *ctx, _9ppkt *pkt, uint32_t buflen)
 {
 	uint8_t type;
 	uint32_t len;
 
-	pkt->buf = buffer;
+	pkt->buf = ctx->buffer;
 
 	/* From intro(5):
 	 *   Each 9P message begins with a four-byte size field
@@ -152,6 +111,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
  * The length field of the given packet should be equal to the amount of
  * space (in bytes) still available in the packet buffer.
  *
+ * @param ctx 9P connection context.
  * @param p Pointer to the memory location containing the T-message. The
  *   caller doesn't need to initialize the `tag` field of this message.
  *   Besides this pointer is also used to store the R-message send by
@@ -159,7 +119,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
  * @return `0` on success, on error a negative errno is returned.
  */
 static int
-do9p(_9ppkt *p)
+do9p(_9pctx *ctx, _9ppkt *p)
 {
 	ssize_t ret;
 	_9ptype ttype;
@@ -174,8 +134,8 @@ do9p(_9ppkt *p)
 	p->tag = (p->type == Tversion) ?
 		_9P_NOTAG : random_uint32();
 
-	p->buf = buffer; /* Reset buffer position. */
-	reallen = msize - p->len;
+	p->buf = ctx->buffer; /* Reset buffer position. */
+	reallen = ctx->msize - p->len;
 
 	/* Build the "header", meaning: size[4] type[1] tag[2]
 	 * Every 9P message needs those first 7 bytes. */
@@ -184,7 +144,7 @@ do9p(_9ppkt *p)
 	htop16(p->tag, p);
 
 	DEBUG("Sending %"PRIu32" bytes to server...\n", reallen);
-	if ((ret = sock_tcp_write(&sock, buffer, reallen)) < 0)
+	if ((ret = sock_tcp_write(&ctx->sock, ctx->buffer, reallen)) < 0)
 		return ret;
 
 	/* Tag and type will be overwritten by _9pheader. */
@@ -192,7 +152,8 @@ do9p(_9ppkt *p)
 	ttag = p->tag;
 
 	DEBUG("Reading from server...\n");
-	if ((ret = sock_tcp_read(&sock, buffer, msize, _9P_TIMOUT)) < 0)
+	if ((ret = sock_tcp_read(&ctx->sock, ctx->buffer,
+			ctx->msize, _9P_TIMOUT)) < 0)
 		return ret;
 
 	/* Maximum length of a 9P message is 2^32. */
@@ -200,7 +161,7 @@ do9p(_9ppkt *p)
 		return -EMSGSIZE;
 
 	DEBUG("Read %zu bytes from server, parsing them...\n", ret);
-	if ((ret = _9pheader(p, (uint32_t)ret)))
+	if ((ret = _9pheader(ctx, p, (uint32_t)ret)))
 		return ret;
 
 	if (p->tag != ttag) {
@@ -223,13 +184,14 @@ do9p(_9ppkt *p)
  *
  * @pre t == Tclunk || t == Tremove
  *
+ * @param ctx 9P connection context.
  * @param f Pointer to fid on which the operation should be performed.
  * @param t Type of the operation which should be performed.
  *
  * @return `0` on success, on error a negative errno is returned.
  */
 static int
-fidrem(_9pfid *f, _9ptype t)
+fidrem(_9pctx *ctx, _9pfid *f, _9ptype t)
 {
 	int r;
 	_9ppkt pkt;
@@ -239,10 +201,10 @@ fidrem(_9pfid *f, _9ptype t)
 	/* From intro(5):
 	 *   size[4] Tclunk|Tremove tag[2] fid[4]
 	 */
-	newpkt(&pkt, t);
+	newpkt(ctx, &pkt, t);
 	htop32(f->fid, &pkt);
 
-	if ((r = do9p(&pkt)))
+	if ((r = do9p(ctx, &pkt)))
 		return r;
 
 	/* From intro(5):
@@ -252,7 +214,7 @@ fidrem(_9pfid *f, _9ptype t)
 	 * Therefore we don't need to parse anything here.
 	 */
 
-	if (!fidtbl(f->fid, DEL))
+	if (!fidtbl(ctx->fids, f->fid, DEL))
 		return -EBADF;
 
 	return 0;
@@ -263,12 +225,13 @@ fidrem(_9pfid *f, _9ptype t)
  * two messages consists of a qid and an iounit. The values of both
  * fields are stored in the given fid.
  *
+ * @param ctx 9P connection context.
  * @param f Pointer to the fid associated with the new file.
  * @param pkt Pointer to the packet from which the body should be read.
  * @return `0` on success, on error a negative errno is returned.
  */
 static int
-newfile(_9pfid *f, _9ppkt *pkt)
+newfile(_9pctx *ctx, _9pfid *f, _9ppkt *pkt)
 {
 	if (hqid(&f->qid, pkt) || pkt->len < BIT32SZ)
 		return -EBADMSG;
@@ -281,7 +244,7 @@ newfile(_9pfid *f, _9ppkt *pkt)
 	 *   breaking the I/O transfer into multiple 9P messages
 	 */
 	if (!f->iounit)
-		f->iounit = msize - _9P_IOHDRSIZ;
+		f->iounit = ctx->msize - _9P_IOHDRSIZ;
 
 	f->off = 0;
 	return 0;
@@ -295,6 +258,7 @@ newfile(_9pfid *f, _9ppkt *pkt)
  *
  * @pre t == Twrite || t == Tread
  *
+ * @param ctx 9P connection context.
  * @param f Pointer to fid on which a read or write operation should be
  * 	performed.
  * @param buf Pointer to a buffer from which data should be written to
@@ -304,7 +268,7 @@ newfile(_9pfid *f, _9ppkt *pkt)
  * @param t Type of the operation which should be performed.
  */
 static int
-ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
+ioloop(_9pctx *ctx, _9pfid *f, char *buf, size_t count, _9ptype t)
 {
 	int r;
 	size_t n;
@@ -319,7 +283,7 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		 *   size[4] Tread tag[2] fid[4] offset[8] count[4]
 		 *   size[4] Twrite tag[2] fid[4] offset[8] count[4] data[count]
 		 */
-		newpkt(&pkt, t);
+		newpkt(ctx, &pkt, t);
 		htop32(f->fid, &pkt);
 		htop64(f->off, &pkt);
 
@@ -342,7 +306,7 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 		DEBUG("Sending %s with offset %"PRIu64" and count %"PRIu32"\n",
 			(t == Tread) ? "Tread" : "Twrite", f->off, pcnt);
 
-		if ((r = do9p(&pkt)))
+		if ((r = do9p(ctx, &pkt)))
 			return r;
 
 		/* From intro(5):
@@ -384,36 +348,17 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 /**@}*/
 
 /**
- * Initializes the 9P module. Among other things it opens a TCP socket
- * but it does not initiate the connection with the server. This has to
- * be done manually using the ::_9pversion and ::_9pattach functions.
+ * Initializes a 9P connection context. Only the sock member of the
+ * given pointer needs to be set by the caller beforehand.
  *
- * @param remote Pointer to TCP endpoint of the server to connect to.
- * @return `0` on success, on error a negative errno is returned.
- */
-int
-_9pinit(sock_tcp_ep_t *remote)
-{
-	int r;
-
-	random_init(xtimer_now().ticks32);
-
-	DEBUG("Connecting to TCP socket...\n");
-	if ((r = sock_tcp_connect(&sock, remote, 0, SOCK_FLAGS_REUSE_EP)))
-		return r;
-
-	return 0;
-}
-
-/**
- * Closes an existing 9P connection freeing all resources on the server
- * and the client.
+ * @param ctx 9P connection context which should be initialized.
  */
 void
-_9pclose(void)
+_9pinit(_9pctx *ctx)
 {
-	memset(fids, '\0', _9P_MAXFIDS * sizeof(_9pfid));
-	sock_tcp_disconnect(&sock);
+	random_init(xtimer_now().ticks32);
+	memset(ctx->fids, 0, _9P_MAXFIDS * sizeof(_9pfid));
+	ctx->msize = _9P_MSIZE;
 }
 
 /**
@@ -429,6 +374,8 @@ _9pclose(void)
  * `_9P_MSIZE`. The msize choosen by the server is stored in the global
  * ::msize variable.
  *
+ * @param ctx 9P connection context.
+ *
  * @return `0` on success.
  * @return `-EBADMSG` if the 9P message was invalid.
  * @return `-EMSGSIZE` if the server msize was greater than `_9P_MSIZE`.
@@ -436,7 +383,7 @@ _9pclose(void)
  *   9P network protocol.
  */
 int
-_9pversion(void)
+_9pversion(_9pctx *ctx)
 {
 	int r;
 	char ver[_9P_VERLEN];
@@ -445,12 +392,12 @@ _9pversion(void)
 	/* From intro(5):
 	 *   size[4] Tversion tag[2] msize[4] version[s]
 	 */
-	newpkt(&pkt, Tversion);
+	newpkt(ctx, &pkt, Tversion);
 	htop32(_9P_MSIZE, &pkt);
 	if (pstring(_9P_VERSION, &pkt))
 		return -EOVERFLOW;
 
-	if ((r = do9p(&pkt)))
+	if ((r = do9p(ctx, &pkt)))
 		return r;
 
 	/* From intro(5):
@@ -463,19 +410,19 @@ _9pversion(void)
 	 */
 	if (pkt.len <= 10)
 		return -EBADMSG;
-	ptoh32(&msize, &pkt);
+	ptoh32(&ctx->msize, &pkt);
 
-	DEBUG("Msize of Rversion message: %"PRIu32"\n", msize);
+	DEBUG("Msize of Rversion message: %"PRIu32"\n", ctx->msize);
 
 	/* From version(5):
 	 *   The server responds with its own maximum, msize, which must
 	 *   be less than or equal to the client's value.
 	 */
-	if (msize > _9P_MSIZE) {
-		DEBUG("Servers msize is too large (%"PRIu32")\n", msize);
+	if (ctx->msize > _9P_MSIZE) {
+		DEBUG("Servers msize is too large (%"PRIu32")\n", ctx->msize);
 		return -EMSGSIZE;
-	} else if (msize < _9P_MINSIZE) {
-		DEBUG("Servers msize is too small (%"PRIu32")\n", msize);
+	} else if (ctx->msize < _9P_MINSIZE) {
+		DEBUG("Servers msize is too small (%"PRIu32")\n", ctx->msize);
 		return -EOVERFLOW;
 	}
 
@@ -504,6 +451,7 @@ _9pversion(void)
  * The afid parameter is always set to the value of `_9P_NOFID` since
  * authentication is not supported currently.
  *
+ * @param ctx 9P connection context.
  * @param dest Pointer to a pointer which should be set to the address
  *   of the corresponding entry in the fid table.
  * @param uname User identification.
@@ -511,7 +459,7 @@ _9pversion(void)
  * @return `0` on success, on error a negative errno is returned.
  */
 int
-_9pattach(_9pfid **dest, char *uname, char *aname)
+_9pattach(_9pctx *ctx, _9pfid **dest, char *uname, char *aname)
 {
 	int r;
 	_9pfid *fid;
@@ -520,19 +468,19 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
 	/* From intro(5):
 	 *   size[4] Tattach tag[2] fid[4] afid[4] uname[s] aname[s]
 	 */
-	newpkt(&pkt, Tattach);
+	newpkt(ctx, &pkt, Tattach);
 	htop32(_9P_ROOTFID, &pkt);
 	htop32(_9P_NOFID, &pkt);
 	if (pstring(uname, &pkt) || pstring(aname, &pkt))
 		return -EOVERFLOW;
 
-	if ((r = do9p(&pkt)))
+	if ((r = do9p(ctx, &pkt)))
 		return r;
 
 	/* From intro(5):
 	 *   size[4] Rattach tag[2] qid[13]
 	 */
-	if (!(fid = fidtbl(_9P_ROOTFID, ADD)))
+	if (!(fid = fidtbl(ctx->fids, _9P_ROOTFID, ADD)))
 		return -ENFILE;
 	fid->fid = _9P_ROOTFID;
 
@@ -552,13 +500,14 @@ _9pattach(_9pfid **dest, char *uname, char *aname)
  *   file is not removed on the server unless the fid had been opened
  *   with ORCLOSE.
  *
+ * @param ctx 9P connection context.
  * @param f Pointer to a fid which should be closed.
  * @return `0` on success, on error a negative errno is returned.
  */
 inline int
-_9pclunk(_9pfid *f)
+_9pclunk(_9pctx *ctx, _9pfid *f)
 {
-	return fidrem(f, Tclunk);
+	return fidrem(ctx, f, Tclunk);
 }
 
 /**
@@ -571,12 +520,13 @@ _9pclunk(_9pfid *f)
  *
  * Retrieves information about the file associated with the given fid.
  *
+ * @param ctx 9P connection context.
  * @param fid Fid of the file to retrieve information for.
  * @param buf Pointer to stat struct to fill.
  * @return `0` on success, on error a negative errno is returned.
  */
 int
-_9pstat(_9pfid *fid, struct stat *b)
+_9pstat(_9pctx *ctx, _9pfid *fid, struct stat *b)
 {
 	int r;
 	uint32_t mode;
@@ -585,10 +535,10 @@ _9pstat(_9pfid *fid, struct stat *b)
 	/* From intro(5):
 	 *   size[4] Tstat tag[2] fid[4]
 	 */
-	newpkt(&pkt, Tstat);
+	newpkt(ctx, &pkt, Tstat);
 	htop32(fid->fid, &pkt);
 
-	if ((r = do9p(&pkt)))
+	if ((r = do9p(ctx, &pkt)))
 		return -1;
 
 	/* From intro(5):
@@ -618,7 +568,7 @@ _9pstat(_9pfid *fid, struct stat *b)
 	b->st_dev = b->st_ino = b->st_rdev = 0;
 	b->st_nlink = 1;
 	b->st_uid = b->st_gid = 0;
-	b->st_blksize = msize - _9P_IOHDRSIZ;
+	b->st_blksize = ctx->msize - _9P_IOHDRSIZ;
 	b->st_blocks = b->st_size / b->st_blksize + 1;
 
 	/* name, uid, gid and muid are ignored. */
@@ -646,13 +596,14 @@ _9pstat(_9pfid *fid, struct stat *b)
  * unlikely that this limit will be reached. Therefore this function
  * doesn't support sending walk messages that exceed this limit.
  *
+ * @param ctx 9P connection context.
  * @param dest Pointer to a pointer which should be set to the address
  *   of the corresponding entry in the fid table.
  * @param path Path which should be walked.
  * @return `0` on success, on error a negative errno is returned.
  */
 int
-_9pwalk(_9pfid **dest, char *path)
+_9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 {
 	int r;
 	char *cur, *sep;
@@ -668,14 +619,14 @@ _9pwalk(_9pfid **dest, char *path)
 	else
 		len = strlen(path);
 
-	if (!(fid = newfid()))
+	if (!(fid = newfid(ctx->fids)))
 		return -ENFILE;
 
 	/* From intro(5):
 	 *   size[4] Twalk tag[2] fid[4] newfid[4] nwname[2]
 	 *   nwname*(wname[s])
 	 */
-	newpkt(&pkt, Twalk);
+	newpkt(ctx, &pkt, Twalk);
 	htop32(_9P_ROOTFID, &pkt);
 	htop32(fid->fid, &pkt);
 
@@ -710,7 +661,7 @@ _9pwalk(_9pfid **dest, char *path)
 	pkt.len += BIT16SZ;
 	htop16(n, &pkt);
 
-	if ((r = do9p(&pkt)))
+	if ((r = do9p(ctx, &pkt)))
 		goto err;
 
 	/* From intro(5):
@@ -744,7 +695,7 @@ _9pwalk(_9pfid **dest, char *path)
 	return 0;
 
 err:
-	assert(fidtbl(fid->fid, DEL) != NULL);
+	assert(fidtbl(ctx->fids, fid->fid, DEL) != NULL);
 	return r;
 }
 
@@ -753,13 +704,14 @@ err:
  *   The open request asks the file server to check permissions and
  *   prepare a fid for I/O with subsequent read and write messages.
  *
+ * @param ctx 9P connection context.
  * @param f Fid which should be opened for I/O.
  * @param flags Flags used for opening the fid. Supported flags are:
  * 	OREAD, OWRITE, ORDWR and OTRUNC.
  * @return `0` on success, on error a negative errno is returned.
  */
 int
-_9popen(_9pfid *f, int flags)
+_9popen(_9pctx *ctx, _9pfid *f, int flags)
 {
 	int r;
 	_9ppkt pkt;
@@ -767,17 +719,17 @@ _9popen(_9pfid *f, int flags)
 	/* From intro(5):
 	 *   size[4] Topen tag[2] fid[4] mode[1]
 	 */
-	newpkt(&pkt, Topen);
+	newpkt(ctx, &pkt, Topen);
 	htop32(f->fid, &pkt);
 	htop8(flags, &pkt);
 
-	if ((r = do9p(&pkt)))
+	if ((r = do9p(ctx, &pkt)))
 		return r;
 
 	/* From intro(5):
 	 *   size[4] Ropen tag[2] qid[13] iounit[4]
 	 */
-	if ((r = newfile(f, &pkt)))
+	if ((r = newfile(ctx, f, &pkt)))
 		return r;
 
 	return 0;
@@ -793,7 +745,8 @@ _9popen(_9pfid *f, int flags)
  * fid will no longer represent the directory, instead it now represents
  * the newly created file.
  *
- * @param Pointer to the fid associated with the directory in which a
+ * @param ctx 9P connection context.
+ * @param f Pointer to the fid associated with the directory in which a
  * 	new file should be created.
  * @param name Name which should be used for the newly created file.
  * @param perm Permissions with which the new file should be created.
@@ -801,7 +754,7 @@ _9popen(_9pfid *f, int flags)
  *   afterwards. See ::_9popen.
  */
 int
-_9pcreate(_9pfid *f, char *name, int perm, int flags)
+_9pcreate(_9pctx *ctx, _9pfid *f, char *name, int perm, int flags)
 {
 	int r;
 	_9ppkt pkt;
@@ -809,20 +762,20 @@ _9pcreate(_9pfid *f, char *name, int perm, int flags)
 	/* From intro(5):
 	 *   size[4] Tcreate tag[2] fid[4] name[s] perm[4] mode[1]
 	 */
-	newpkt(&pkt, Tcreate);
+	newpkt(ctx, &pkt, Tcreate);
 	htop32(f->fid, &pkt);
 	if (pstring(name, &pkt) || BIT32SZ + BIT8SZ > pkt.len)
 		return -EOVERFLOW;
 	htop32(perm, &pkt);
 	htop8(flags, &pkt);
 
-	if ((r = do9p(&pkt)))
+	if ((r = do9p(ctx, &pkt)))
 		return r;
 
 	/* From intro(5):
 	 *   size[4] Rcreate tag[2] qid[13] iounit[4]
 	 */
-	if ((r = newfile(f, &pkt)))
+	if ((r = newfile(ctx, f, &pkt)))
 		return r;
 
 	return 0;
@@ -834,6 +787,7 @@ _9pcreate(_9pfid *f, char *name, int perm, int flags)
  *   identified by fid, which must be opened for reading, start-
  *   ing offset bytes after the beginning of the file.
  *
+ * @param ctx 9P connection context.
  * @param f Fid from which data should be read.
  * @param dest Pointer to a buffer to which the received data should be
  * 	written.
@@ -842,9 +796,9 @@ _9pcreate(_9pfid *f, char *name, int perm, int flags)
  * 	error.
  */
 inline ssize_t
-_9pread(_9pfid *f, char *dest, size_t count)
+_9pread(_9pctx *ctx, _9pfid *f, char *dest, size_t count)
 {
-	return ioloop(f, dest, count, Tread);
+	return ioloop(ctx, f, dest, count, Tread);
 }
 
 /**
@@ -853,6 +807,7 @@ _9pread(_9pfid *f, char *dest, size_t count)
  *   file identified by fid, which must be opened for writing, starting
  *   offset bytes after the beginning of the file.
  *
+ * @param ctx 9P connection context.
  * @param f Pointer to the fid to which data should be written.
  * @param src Pointer to a buffer containing the data which should be
  * 	written to the file.
@@ -861,9 +816,9 @@ _9pread(_9pfid *f, char *dest, size_t count)
  * 	error.
  */
 ssize_t
-_9pwrite(_9pfid *f, char *src, size_t count)
+_9pwrite(_9pctx *ctx, _9pfid *f, char *src, size_t count)
 {
-	return ioloop(f, src, count, Twrite);
+	return ioloop(ctx, f, src, count, Twrite);
 }
 
 /**
@@ -871,11 +826,12 @@ _9pwrite(_9pfid *f, char *src, size_t count)
  *   The remove request asks the file server both to remove the file
  *   represented by fid and to clunk the fid, even if the remove fails.
  *
+ * @param ctx 9P connection context.
  * @param f Pointer to the fid which should be removed.
  * @return `0` on success, on error a negative errno is returned.
  */
 inline int
-_9premove(_9pfid *f)
+_9premove(_9pctx *ctx, _9pfid *f)
 {
-	return fidrem(f, Tremove);
+	return fidrem(ctx, f, Tremove);
 }

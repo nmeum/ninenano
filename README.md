@@ -46,7 +46,7 @@ Roadmap
 =======
 
 * [ ] Implement vfs_rename
-* [ ] Allow more than one connection
+* [x] Allow more than one connection
 * [ ] Abstraction to allow different transport layers
 * [ ] Better error handling (parse Rerror messages)
 * [ ] Simplify `_fibtbl` function

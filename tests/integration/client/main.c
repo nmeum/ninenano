@@ -40,9 +40,9 @@ enum {
 };
 
 /**
- * Endpoint for the protocol socket.
+ * 9P connection context.
  */
-static sock_tcp_ep_t remote = SOCK_IPV6_EP_ANY;
+static _9pctx ctx;
 
 /**
  * Mount point where the 9pfs is mounted.
@@ -54,11 +54,9 @@ set_up(void)
 {
 	int ret;
 
-	memset(&mountp, '\0', sizeof(vfs_mount_t));
-
 	mountp.mount_point = "/mnt";
 	mountp.fs = &_9p_file_system;
-	mountp.private_data = &remote;
+	mountp.private_data = &ctx;
 
 	if ((ret = vfs_mount(&mountp)))
 		fprintf(stderr, "vfs_mount failed: %d\n", ret);
@@ -238,6 +236,7 @@ int
 main(void)
 {
 	char *addr, *port;
+	sock_tcp_ep_t remote = SOCK_IPV6_EP_ANY;
 
 	GETENV(addr, "NINERIOT_ADDR");
 	GETENV(port, "NINERIOT_PPORT");
@@ -250,6 +249,11 @@ main(void)
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
+
+	if (sock_tcp_connect(&ctx.sock, &remote, 0, SOCK_FLAGS_REUSE_EP) < 0) {
+		fprintf(stderr, "Couldn't connect to server\n");
+		return EXIT_FAILURE;
+	}
 
 	TESTS_START();
 	TESTS_RUN(tests_9pfs_tests());

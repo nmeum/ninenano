@@ -342,25 +342,72 @@ typedef struct {
 	uint16_t tag;
 } _9ppkt;
 
-int _9pinit(sock_tcp_ep_t*);
-void _9pclose(void);
+/**
+ * Connection context for a 9P connection.
+ */
+typedef struct {
+	/**
+	 * Global static buffer used for storing message specific parameters.
+	 * Message indepented parameters are stored on the stack using `_9ppkt`.
+	 */
+	uint8_t buffer[_9P_MSIZE];
 
-int _9pversion(void);
-int _9pattach(_9pfid**, char*, char*);
-int _9pclunk(_9pfid*);
-int _9pstat(_9pfid*, struct stat*);
-int _9pwalk(_9pfid**, char*);
-int _9popen(_9pfid*, int);
-int _9pcreate(_9pfid*, char*, int, int);
-int _9pread(_9pfid*, char*, size_t);
-int _9pwrite(_9pfid*, char*, size_t);
-int _9premove(_9pfid*);
+	/**
+	 * Global Sock TCP socket used for communicating with the 9P server.
+	 *
+	 * We use sock here to be independent of the underlying network stack.
+	 * Currently only the lwip network stack has support for socks's TCP API
+	 * but that will hopefully change in the future.
+	 */
+	sock_tcp_t sock;
+
+	/**
+	 * From version(5):
+	 *   The client suggests a maximum message size, msize, that is the
+	 *   maximum length, in bytes, it will ever generate or expect to
+	 *   receive in a single 9P message.
+	 *
+	 * The msize we are suggestion to the server is defined by the macro
+	 * ::_9P_MSIZE for the unlikly event that the server choosen an msize
+	 * smaller than the one we are suggesting we are storing the msize
+	 * actually used for the communication in this variable.
+	 *
+	 * It is declared with the initial value ::_9P_MSIZE to make it possible
+	 * to use this variable as an argument to ::sock_tcp_read even before a
+	 * session is established.
+	 */
+	uint32_t msize;
+
+	/**
+	 * As with file descriptors, we need to store currently open fids
+	 * somehow. This is done in this static buffer. This buffer should only
+	 * be accessed using the ::fidtbl function it should never be modified
+	 * directly.
+	 *
+	 * This buffer is not static because it is used in the ::fidtbl
+	 * function from `util.c`.
+	 */
+	_9pfid fids[_9P_MAXFIDS];
+} _9pctx;
+
+void _9pinit(_9pctx*);
+
+int _9pversion(_9pctx*);
+int _9pattach(_9pctx*, _9pfid**, char*, char*);
+int _9pclunk(_9pctx*, _9pfid*);
+int _9pstat(_9pctx*, _9pfid*, struct stat*);
+int _9pwalk(_9pctx*, _9pfid**, char*);
+int _9popen(_9pctx*, _9pfid*, int);
+int _9pcreate(_9pctx*, _9pfid*, char*, int, int);
+int _9pread(_9pctx*, _9pfid*, char*, size_t);
+int _9pwrite(_9pctx*, _9pfid*, char*, size_t);
+int _9premove(_9pctx*, _9pfid*);
 
 void advbuf(_9ppkt*, size_t);
 void bufcpy(_9ppkt*, void*, size_t);
 
-_9pfid* fidtbl(uint32_t, _9pfidop);
-_9pfid* newfid(void);
+_9pfid* fidtbl(_9pfid*, uint32_t, _9pfidop);
+_9pfid* newfid(_9pfid*);
 
 int pstring(char*, _9ppkt*);
 int hstring(char*, uint16_t, _9ppkt*);

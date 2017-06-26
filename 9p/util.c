@@ -3,8 +3,6 @@
 #include "9p.h"
 #include "random.h"
 
-extern _9pfid fids[_9P_MAXFIDS];
-
 /**
  * From intro(5):
  *   Each message consists of a sequence of bytes. Two-, four-, and
@@ -74,6 +72,9 @@ bufcpy(_9ppkt *pkt, void *src, size_t n)
  * `fid` field on the struct pointer manually.
  *
  * @pre fid != 0
+ *
+ * @param fids Pointer to fid table which should be modified. The table
+ *   size must be equal to ::_9P_MAXFIDS.
  * @param fid A 32-bit unsigned integer that the client uses to identify
  *   a `current file` on the server.
  * @param op Operating which should be performed for the given fid on
@@ -82,7 +83,7 @@ bufcpy(_9ppkt *pkt, void *src, size_t n)
  *   on failure a NULL pointer is returned instead.
  */
 _9pfid*
-fidtbl(uint32_t fid, _9pfidop op)
+fidtbl(_9pfid *fids, uint32_t fid, _9pfidop op)
 {
 	_9pfid *ret;
 	size_t i, hash;
@@ -117,10 +118,12 @@ fidtbl(uint32_t fid, _9pfidop op)
  * Finds a new **unique** fid for the fid table. Insert it into the fid
  * table and returns a pointer to the new fid table entry.
  *
+ * @param fids Pointer to fid table which should be modified. The table
+ *   size must be equal to ::_9P_MAXFIDS.
  * @return Pointer to fid table entry or NULL if the fid table is full.
  */
 _9pfid*
-newfid(void)
+newfid(_9pfid *fids)
 {
 	_9pfid *r;
 	size_t i;
@@ -128,11 +131,11 @@ newfid(void)
 
 	for (i = 1; i < _9P_MAXFIDS; i++) {
 		fid = random_uint32_range(1, UINT32_MAX);
-		if (fidtbl(fid, GET))
+		if (fidtbl(fids, fid, GET))
 			continue;
 
 		/* TODO room for optimization don't call fidtbl twice. */
-		r = fidtbl(fid, ADD);
+		r = fidtbl(fids, fid, ADD);
 		assert(r != NULL);
 
 		r->fid = fid;
