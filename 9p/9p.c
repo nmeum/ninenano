@@ -113,7 +113,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 		return -EBADMSG;
 	ptoh32(&len, pkt);
 
-	DEBUG("Length of the 9P message: %zu\n", len);
+	DEBUG("Length of the 9P message: %"PRIu32"\n", len);
 	if (len > buflen || len < _9P_HEADSIZ)
 		return -EBADMSG;
 	pkt->len = len - BIT32SZ;
@@ -124,7 +124,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 	 */
 	ptoh8(&type, pkt);
 
-	DEBUG("Type of 9P message: %d\n", type);
+	DEBUG("Type of 9P message: %"PRIu8"\n", type);
 	if (type < Tversion || type >= Tmax)
 		return -EBADMSG;
 	if (type % 2 == 0)
@@ -135,7 +135,7 @@ _9pheader(_9ppkt *pkt, uint32_t buflen)
 	 *   The next two bytes are an identifying tag, described below.
 	 */
 	ptoh16(&pkt->tag, pkt);
-	DEBUG("Tag of 9P message: %d\n", pkt->tag);
+	DEBUG("Tag of 9P message: %"PRIu16"\n", pkt->tag);
 
 	return 0;
 }
@@ -183,7 +183,7 @@ do9p(_9ppkt *p)
 	htop8(p->type, p);
 	htop16(p->tag, p);
 
-	DEBUG("Sending %zu bytes to server...\n", reallen);
+	DEBUG("Sending %"PRIu32" bytes to server...\n", reallen);
 	if ((ret = sock_tcp_write(&sock, buffer, reallen)) < 0)
 		return ret;
 
@@ -204,7 +204,7 @@ do9p(_9ppkt *p)
 		return ret;
 
 	if (p->tag != ttag) {
-		DEBUG("Tag mismatch (%d vs. %d)\n", p->tag, ttag);
+		DEBUG("Tag mismatch (%"PRIu8" vs. %"PRIu8")\n", p->tag, ttag);
 		return -EBADMSG;
 	}
 
@@ -339,7 +339,7 @@ ioloop(_9pfid *f, char *buf, size_t count, _9ptype t)
 			bufcpy(&pkt, &buf[n], pcnt);
 		}
 
-		DEBUG("Sending %s with offset %llu and count %zu\n",
+		DEBUG("Sending %s with offset %"PRIu64" and count %"PRIu32"\n",
 			(t == Tread) ? "Tread" : "Twrite", f->off, pcnt);
 
 		if ((r = do9p(&pkt)))
@@ -465,17 +465,17 @@ _9pversion(void)
 		return -EBADMSG;
 	ptoh32(&msize, &pkt);
 
-	DEBUG("Msize of Rversion message: %d\n", msize);
+	DEBUG("Msize of Rversion message: %"PRIu32"\n", msize);
 
 	/* From version(5):
 	 *   The server responds with its own maximum, msize, which must
 	 *   be less than or equal to the client's value.
 	 */
 	if (msize > _9P_MSIZE) {
-		DEBUG("Servers msize is too large (%d)\n", msize);
+		DEBUG("Servers msize is too large (%"PRIu32")\n", msize);
 		return -EMSGSIZE;
 	} else if (msize < _9P_MINSIZE) {
-		DEBUG("Servers msize is too small (%d)\n", msize);
+		DEBUG("Servers msize is too small (%"PRIu32")\n", msize);
 		return -EOVERFLOW;
 	}
 
@@ -704,7 +704,7 @@ _9pwalk(_9pfid **dest, char *path)
 		bufcpy(&pkt, cur, elen);
 	}
 
-	DEBUG("Constructed Twalk with %d elements\n", n);
+	DEBUG("Constructed Twalk with %zu elements\n", n);
 
 	pkt.buf = nwname;
 	pkt.len += BIT16SZ;
@@ -727,7 +727,7 @@ _9pwalk(_9pfid **dest, char *path)
 	 *   nwqid is therefore either nwname or the index of the first
 	 *   elementwise walk that failed.
 	 */
-	DEBUG("nwqid: %d\n", nwqid);
+	DEBUG("nwqid: %"PRIu16"\n", nwqid);
 	if (nwqid != n || nwqid > pkt.len || nwqid > _9P_MAXWEL) { /* XXX */
 		r = -EBADMSG;
 		goto err;
