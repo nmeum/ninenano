@@ -40,9 +40,9 @@ enum {
 };
 
 /**
- * 9P connection context.
+ * 9P file system superblock.
  */
-static _9pctx ctx;
+static _9pfs fs;
 
 /**
  * Mount point where the 9pfs is mounted.
@@ -56,7 +56,7 @@ set_up(void)
 
 	mountp.mount_point = "/mnt";
 	mountp.fs = &_9p_file_system;
-	mountp.private_data = &ctx;
+	mountp.private_data = &fs;
 
 	if ((ret = vfs_mount(&mountp)))
 		fprintf(stderr, "vfs_mount failed: %d\n", ret);
@@ -250,7 +250,7 @@ main(void)
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
 
-	if (sock_tcp_connect(&ctx.sock, &remote, 0, SOCK_FLAGS_REUSE_EP) < 0) {
+	if (sock_tcp_connect(&fs.ctx.sock, &remote, 0, SOCK_FLAGS_REUSE_EP) < 0) {
 		fprintf(stderr, "Couldn't connect to server\n");
 		return EXIT_FAILURE;
 	}
@@ -259,6 +259,6 @@ main(void)
 	TESTS_RUN(tests_9pfs_tests());
 	TESTS_END();
 
-	sock_tcp_disconnect(&ctx.sock);
+	sock_tcp_disconnect(&fs.ctx.sock);
 	return EXIT_SUCCESS;
 }

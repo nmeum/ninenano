@@ -4,6 +4,7 @@
 
 #include "9p.h"
 #include "vfs.h"
+#include "9pfs.h"
 
 #define ENABLE_DEBUG (1)
 #include "debug.h"
@@ -43,14 +44,16 @@ _9pfs_mount(vfs_mount_t *mountp)
 {
 	int r;
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
 
-	ctx = mountp->private_data;
+	fs = mountp->private_data;
 
-	_9pinit(ctx);
-	if ((r = _9pversion(ctx)))
+	_9pinit(&fs->ctx);
+	mutex_init(&fs->mtx);
+
+	if ((r = _9pversion(&fs->ctx)))
 		return r;
-	if ((r = _9pattach(ctx, &f, "foobar", NULL)))
+	if ((r = _9pattach(&fs->ctx, &f, "foobar", NULL)))
 		return r;
 
 	(void)f;
@@ -69,16 +72,25 @@ static int
 _9pfs_unlink(vfs_mount_t *mountp, const char *name)
 {
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
+	int r;
 
-	ctx = mountp->private_data;
+	r = 0;
+	fs = mountp->private_data;
 
-	if (_9pwalk(ctx, &f, (char*)name))
-		return -ENOENT;
-	if (_9premove(ctx, f))
-		return -EACCES;
+	mutex_lock(&fs->mtx);
+	if (_9pwalk(&fs->ctx, &f, (char*)name)) {
+		r = -ENOENT;
+		goto ret;
+	}
+	if (_9premove(&fs->ctx, f)) {
+		r = -EACCES;
+		goto ret;
+	}
 
-	return 0;
+ret:
+	mutex_unlock(&fs->mtx);
+	return r;
 }
 
 static int
@@ -87,29 +99,41 @@ _9pfs_mkdir(vfs_mount_t *mountp, const char *name, mode_t mode)
 	_9pfid *f;
 	char buf[VFS_NAME_MAX + 1];
 	char *dname, *bname;
-	_9pctx *ctx;
+	_9pfs *fs;
+	int r;
 
-	ctx = mountp->private_data;
+	r = 0;
+	fs = mountp->private_data;
 
-	if (!_9pwalk(ctx, &f, (char*)name)) {
-		_9pclunk(ctx, f);
-		return -EEXIST;
+	mutex_lock(&fs->mtx);
+	if (!_9pwalk(&fs->ctx, &f, (char*)name)) {
+		_9pclunk(&fs->ctx, f);
+		r = -EEXIST;
+		goto ret;
 	}
 
 	bname = breakpath(buf, sizeof(buf), name, &dname);
 	DEBUG("Creating directory '%s' in directory '%s'\n", bname, dname);
 
-	if (_9pwalk(ctx, &f, dname))
-		return -EACCES;
+	if (_9pwalk(&fs->ctx, &f, dname)) {
+		r = -EACCES;
+		goto ret;
+	}
 
 	mode &= 0777;
 	mode |= DMDIR;
 
-	if (_9pcreate(ctx, f, bname, mode, OREAD))
-		return -EACCES;
+	if (_9pcreate(&fs->ctx, f, bname, mode, OREAD)) {
+		_9pclunk(&fs->ctx, f);
+		r = -EACCES;
+		goto ret;
+	}
 
-	_9pclunk(ctx, f);
-	return 0;
+	_9pclunk(&fs->ctx, f);
+
+ret:
+	mutex_unlock(&fs->mtx);
+	return r;
 }
 
 static int
@@ -122,17 +146,28 @@ static int
 _9pfs_stat(vfs_mount_t *mountp, const char *restrict name, struct stat *restrict buf)
 {
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
+	int r;
 
-	ctx = mountp->private_data;
+	fs = mountp->private_data;
 
-	if (_9pwalk(ctx, &f, (char*)name))
-		return -ENOENT;
-	if (_9pstat(ctx, f, buf))
-		return -EACCES;
+	mutex_lock(&fs->mtx);
+	if (_9pwalk(&fs->ctx, &f, (char*)name)) {
+		r = -ENOENT;
+		goto ret;
+	}
 
-	_9pclunk(ctx, f);
-	return 0;
+	if (_9pstat(&fs->ctx, f, buf)) {
+		_9pclunk(&fs->ctx, f);
+		r = -EACCES;
+		goto ret;
+	}
+
+	_9pclunk(&fs->ctx, f);
+
+ret:
+	mutex_unlock(&fs->mtx);
+	return r;
 }
 
 /**@}*/
@@ -147,13 +182,17 @@ static int
 _9pfs_close(vfs_file_t *filp)
 {
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
 
 	f = filp->private_data.ptr;
-	ctx = filp->mp->private_data;
+	fs = filp->mp->private_data;
 
-	if (_9pclunk(ctx, f) == -EBADF)
+	mutex_lock(&fs->mtx);
+	if (_9pclunk(&fs->ctx, f) == -EBADF) {
+		mutex_unlock(&fs->mtx);
 		return -EBADF;
+	}
+	mutex_unlock(&fs->mtx);
 
 	return 0;
 }
@@ -162,13 +201,17 @@ static int
 _9pfs_fstat(vfs_file_t *filp, struct stat *buf)
 {
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
 
 	f = filp->private_data.ptr;
-	ctx = filp->mp->private_data;
+	fs = filp->mp->private_data;
 
-	if (_9pstat(ctx, f, buf))
+	mutex_lock(&fs->mtx);
+	if (_9pstat(&fs->ctx, f, buf)) {
+		mutex_unlock(&fs->mtx);
 		return -EACCES;
+	}
+	mutex_unlock(&fs->mtx);
 
 	return 0;
 }
@@ -176,11 +219,11 @@ _9pfs_fstat(vfs_file_t *filp, struct stat *buf)
 static off_t _9pfs_lseek(vfs_file_t *filp, off_t off, int whence)
 {
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
 	struct stat st;
 
 	f = filp->private_data.ptr;
-	ctx = filp->mp->private_data;
+	fs = filp->mp->private_data;
 
 	switch (whence) {
 		case SEEK_SET:
@@ -189,8 +232,12 @@ static off_t _9pfs_lseek(vfs_file_t *filp, off_t off, int whence)
 			off += f->off;
 			break;
 		case SEEK_END:
-			if (_9pstat(ctx, f, &st))
+			mutex_lock(&fs->mtx);
+			if (_9pstat(&fs->ctx, f, &st)) {
+				mutex_unlock(&fs->mtx);
 				return -EINVAL;
+			}
+			mutex_unlock(&fs->mtx);
 
 			off += st.st_size;
 			break;
@@ -208,15 +255,16 @@ static off_t _9pfs_lseek(vfs_file_t *filp, off_t off, int whence)
 static int
 _9pfs_open(vfs_file_t *filp, const char *name, int flags, mode_t mode, const char *abs_path)
 {
-	int fl;
+	int r, fl;
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
 	char buf[VFS_NAME_MAX + 1];
 	char *bname, *dname;
 
 	(void)abs_path;
 
-	ctx = filp->mp->private_data;
+	r = 0;
+	fs = filp->mp->private_data;
 
 	/* Convert the mode. This assumes that OREAD == O_RDONLY,
 	 * O_WRONLY == OWRITE and O_RDWR == ORDWR which should always be
@@ -225,29 +273,39 @@ _9pfs_open(vfs_file_t *filp, const char *name, int flags, mode_t mode, const cha
 	if (flags & O_TRUNC)
 		fl |= OTRUNC;
 
-	if (!_9pwalk(ctx, &f, (char*)name)) {
-		if (_9popen(ctx, f, fl)) {
-			_9pclunk(ctx, f);
-			return -EACCES;
+	mutex_lock(&fs->mtx);
+	if (!_9pwalk(&fs->ctx, &f, (char*)name)) {
+		if (_9popen(&fs->ctx, f, fl)) {
+			_9pclunk(&fs->ctx, f);
+			r = -EACCES;
+			goto ret;
 		}
 
 		filp->private_data.ptr = f;
-		return 0;
+		goto ret;
 	} else if (flags & O_CREAT) {
 		bname = breakpath(buf, sizeof(buf), name, &dname);
-		if (_9pwalk(ctx, &f, dname))
-			return -ENOENT;
+		if (_9pwalk(&fs->ctx, &f, dname)) {
+			r = -ENOENT;
+			goto ret;
+		}
 
-		if (_9pcreate(ctx, f, bname, mode, flags)) {
-			_9pclunk(ctx, f);
-			return -EACCES;
+		if (_9pcreate(&fs->ctx, f, bname, mode, flags)) {
+			_9pclunk(&fs->ctx, f);
+			r = -EACCES;
+			goto ret;
 		}
 
 		filp->private_data.ptr = f;
-		return 0;
+		goto ret;
 	} else {
-		return -ENOENT;
+		r = -ENOENT;
+		goto ret;
 	}
+
+ret:
+	mutex_unlock(&fs->mtx);
+	return r;
 }
 
 static ssize_t
@@ -255,13 +313,17 @@ _9pfs_read(vfs_file_t *filp, void *dest, size_t nbytes)
 {
 	ssize_t ret;
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
 
 	f = filp->private_data.ptr;
-	ctx = filp->mp->private_data;
+	fs = filp->mp->private_data;
 
-	if ((ret = _9pread(ctx, f, dest, nbytes)) < 0)
+	mutex_lock(&fs->mtx);
+	if ((ret = _9pread(&fs->ctx, f, dest, nbytes)) < 0) {
+		mutex_unlock(&fs->mtx);
 		return -EIO;
+	}
+	mutex_unlock(&fs->mtx);
 
 	return ret;
 }
@@ -271,13 +333,17 @@ _9pfs_write(vfs_file_t *filp, const void *src, size_t nbytes)
 {
 	ssize_t ret;
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
 
 	f = filp->private_data.ptr;
-	ctx = filp->mp->private_data;
+	fs = filp->mp->private_data;
 
-	if ((ret = _9pwrite(ctx, f, (void*)src, nbytes)) < 0)
+	mutex_lock(&fs->mtx);
+	if ((ret = _9pwrite(&fs->ctx, f, (void*)src, nbytes)) < 0) {
+		mutex_unlock(&fs->mtx);
 		return -EIO;
+	}
+	mutex_unlock(&fs->mtx);
 
 	return ret;
 }
@@ -294,27 +360,37 @@ static int
 _9pfs_opendir(vfs_DIR *dirp, const char *dirname, const char *abs_path)
 {
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
+	int r;
 
 	(void)abs_path;
 
-	ctx = dirp->mp->private_data;
+	r = 0;
+	fs = dirp->mp->private_data;
 
-	if (_9pwalk(ctx, &f, (char*)dirname))
-		return -ENOENT;
+	mutex_lock(&fs->mtx);
+	if (_9pwalk(&fs->ctx, &f, (char*)dirname)) {
+		r = -ENOENT;
+		goto ret;
+	}
 
-	if (_9popen(ctx, f, OREAD)) {
-		_9pclunk(ctx, f);
-		return -EACCES;
+	if (_9popen(&fs->ctx, f, OREAD)) {
+		_9pclunk(&fs->ctx, f);
+		r = -EACCES;
+		goto ret;
 	}
 
 	if (!(f->qid.type & QTDIR)) {
-		_9pclunk(ctx, f);
-		return -ENOTDIR;
+		_9pclunk(&fs->ctx, f);
+		r = -ENOTDIR;
+		goto ret;
 	}
 
 	dirp->private_data.ptr = f;
-	return 0;
+
+ret:
+	mutex_unlock(&fs->mtx);
+	return r;
 }
 
 static int
@@ -323,40 +399,55 @@ _9pfs_readdir(vfs_DIR *dirp, vfs_dirent_t *entry)
 	ssize_t n;
 	_9pfid *f;
 	_9ppkt pkt;
-	_9pctx *ctx;
+	_9pfs *fs;
 	char dest[_9P_STATSIZ + VFS_NAME_MAX + 1];
+	int r;
 
+	r = 0;
 	f = dirp->private_data.ptr;
-	ctx = dirp->mp->private_data;
+	fs = dirp->mp->private_data;
 
-	if ((n = _9pread(ctx, f, dest, sizeof(dest))) < 0)
-		return -EIO;
-	else if (n == 0)
-		return 0;
+	mutex_lock(&fs->mtx);
+	if ((n = _9pread(&fs->ctx, f, dest, sizeof(dest))) < 0) {
+		r = -EIO;
+		goto ret;
+	} else if (n == 0) {
+		goto ret;
+	}
 
 	pkt.len = n;
 	pkt.buf = (unsigned char*)dest;
 
 	/* Skip all the information we don't need. */
 	advbuf(&pkt, 2 * BIT16SZ + BIT32SZ + _9P_QIDSIZ + 3 * BIT32SZ + BIT64SZ);
-	if (hstring(entry->d_name, sizeof(entry->d_name), &pkt))
-		return -EIO;
+	if (hstring(entry->d_name, sizeof(entry->d_name), &pkt)) {
+		r = -EIO;
+		goto ret;
+	}
 
 	entry->d_ino = 0; /* XXX */
-	return 1;
+	r = 1;
+
+ret:
+	mutex_unlock(&fs->mtx);
+	return r;
 }
 
 static int
 _9pfs_closedir(vfs_DIR *dirp)
 {
 	_9pfid *f;
-	_9pctx *ctx;
+	_9pfs *fs;
 
 	f = dirp->private_data.ptr;
-	ctx = dirp->mp->private_data;
+	fs = dirp->mp->private_data;
 
-	if (_9pclunk(ctx, f) == -EBADF)
+	mutex_lock(&fs->mtx);
+	if (_9pclunk(&fs->ctx, f) == -EBADF) {
+		mutex_unlock(&fs->mtx);
 		return -EBADF;
+	}
+	mutex_unlock(&fs->mtx);
 
 	return 0;
 }
