@@ -16,19 +16,7 @@
 #include "net/sock/tcp.h"
 
 #include "embUnit.h"
-
-/**
- * Retrieve value of environment variable using getenv(3) and return
- * `EXIT_FAILURE` if the result was a NULL pointer.
- *
- * @param VAR Name of the variable to store result in.
- * @param ENV Name of the environment variable.
- */
-#define GETENV(VAR, ENV) \
-	do { if (!(VAR = getenv(ENV))) { \
-		fprintf(stderr, "%s is not set or empty\n", ENV); \
-		return EXIT_FAILURE; } \
-	} while (0)
+#include "../../util.h"
 
 /**
  * TCP control socket.
@@ -740,12 +728,12 @@ main(void)
 	cr.port = atoi(cport);
 
 	if (sock_tcp_connect(&csock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0
-			|| sock_tcp_connect(&ctx.sock, &pr, 0, SOCK_FLAGS_REUSE_EP) < 0) {
+			|| sock_tcp_connect(&psock, &pr, 0, SOCK_FLAGS_REUSE_EP) < 0) {
 		fprintf(stderr, "Couldn't connect to server\n");
 		return EXIT_FAILURE;
 	}
 
-	_9pinit(&ctx);
+	_9pinit(&ctx, recvfn, sendfn);
 
 	TESTS_START();
 	TESTS_RUN(tests_9putil_tests());
@@ -753,7 +741,7 @@ main(void)
 	TESTS_END();
 
 	sock_tcp_disconnect(&csock);
-	sock_tcp_disconnect(&ctx.sock);
+	sock_tcp_disconnect(&psock);
 
 	return EXIT_SUCCESS;
 }

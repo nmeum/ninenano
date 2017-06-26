@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <byteorder.h>
 #include <string.h>
@@ -144,7 +145,7 @@ do9p(_9pctx *ctx, _9ppkt *p)
 	htop16(p->tag, p);
 
 	DEBUG("Sending %"PRIu32" bytes to server...\n", reallen);
-	if ((ret = sock_tcp_write(&ctx->sock, ctx->buffer, reallen)) < 0)
+	if ((ret = ctx->write(ctx->buffer, reallen)) < 0)
 		return ret;
 
 	/* Tag and type will be overwritten by _9pheader. */
@@ -152,8 +153,7 @@ do9p(_9pctx *ctx, _9ppkt *p)
 	ttag = p->tag;
 
 	DEBUG("Reading from server...\n");
-	if ((ret = sock_tcp_read(&ctx->sock, ctx->buffer,
-			ctx->msize, _9P_TIMOUT)) < 0)
+	if ((ret = ctx->read(ctx->buffer, ctx->msize)) < 0)
 		return ret;
 
 	/* Maximum length of a 9P message is 2^32. */
@@ -348,17 +348,21 @@ ioloop(_9pctx *ctx, _9pfid *f, char *buf, size_t count, _9ptype t)
 /**@}*/
 
 /**
- * Initializes a 9P connection context. Only the sock member of the
- * given pointer needs to be set by the caller beforehand.
+ * Initializes a 9P connection context.
  *
+ * @param read Function used for receiving data from the server.
+ * @param write Function used for sending data to the server.
  * @param ctx 9P connection context which should be initialized.
  */
 void
-_9pinit(_9pctx *ctx)
+_9pinit(_9pctx *ctx, iofunc *read, iofunc *write)
 {
 	random_init(xtimer_now().ticks32);
 	memset(ctx->fids, 0, _9P_MAXFIDS * sizeof(_9pfid));
+
 	ctx->msize = _9P_MSIZE;
+	ctx->write = write;
+	ctx->read = read;
 }
 
 /**

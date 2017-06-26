@@ -5,8 +5,6 @@
 #include <stddef.h>
 #include <sys/stat.h>
 
-#include "net/sock/tcp.h"
-
 /**
  * 9P version implemented by this library.
  *
@@ -23,15 +21,6 @@
  */
 #ifndef _9P_MSIZE
   #define _9P_MSIZE 1024
-#endif
-
-/**
- * Timeout used for reading from the connection socket. Defaults to not
- * using a timeout at all potentially waiting for ever if no data is
- * received.
- */
-#ifndef _9P_TIMOUT
-  #define _9P_TIMOUT SOCK_NO_TIMEOUT
 #endif
 
 /**
@@ -343,6 +332,18 @@ typedef struct {
 } _9ppkt;
 
 /**
+ * Function used for receiving data that should be parsed as a 9P
+ * R-messages and for sending T-messages to the server.
+ *
+ * @param buf Pointer where the data should be written to / read from.
+ * @param bufsiz Maximum space available at @p data.
+ * @return The number of bytes read on success.
+ * @return `0`, if no read data is available, but everything is in order.
+ * @return A negative errno value on error.
+ */
+typedef ssize_t (iofunc)(void *buf, size_t bufsiz);
+
+/**
  * Connection context for a 9P connection.
  */
 typedef struct {
@@ -353,13 +354,14 @@ typedef struct {
 	uint8_t buffer[_9P_MSIZE];
 
 	/**
-	 * Global Sock TCP socket used for communicating with the 9P server.
-	 *
-	 * We use sock here to be independent of the underlying network stack.
-	 * Currently only the lwip network stack has support for socks's TCP API
-	 * but that will hopefully change in the future.
+	 * Function used to receive R-messages.
 	 */
-	sock_tcp_t sock;
+	iofunc *read;
+
+	/**
+	 * Function used to send T-messages.
+	 */
+	iofunc *write;
 
 	/**
 	 * From version(5):
@@ -390,7 +392,7 @@ typedef struct {
 	_9pfid fids[_9P_MAXFIDS];
 } _9pctx;
 
-void _9pinit(_9pctx*);
+void _9pinit(_9pctx*, iofunc*, iofunc*);
 
 int _9pversion(_9pctx*);
 int _9pattach(_9pctx*, _9pfid**, char*, char*);

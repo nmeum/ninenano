@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -18,19 +19,7 @@
 #include "net/sock/tcp.h"
 
 #include "embUnit.h"
-
-/**
- * Retrieve value of environment variable using getenv(3) and return
- * `EXIT_FAILURE` if the result was a NULL pointer.
- *
- * @param VAR Name of the variable to store result in.
- * @param ENV Name of the environment variable.
- */
-#define GETENV(VAR, ENV) \
-	do { if (!(VAR = getenv(ENV))) { \
-		fprintf(stderr, "%s is not set or empty\n", ENV); \
-		return EXIT_FAILURE; } \
-	} while (0)
+#include "../../util.h"
 
 /**
  * Various global variables.
@@ -250,15 +239,17 @@ main(void)
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
 
-	if (sock_tcp_connect(&ctx.sock, &remote, 0, SOCK_FLAGS_REUSE_EP) < 0) {
+	if (sock_tcp_connect(&psock, &remote, 0, SOCK_FLAGS_REUSE_EP) < 0) {
 		fprintf(stderr, "Couldn't connect to server\n");
 		return EXIT_FAILURE;
 	}
+
+	_9pinit(&ctx, recvfn, sendfn);
 
 	TESTS_START();
 	TESTS_RUN(tests_9pfs_tests());
 	TESTS_END();
 
-	sock_tcp_disconnect(&ctx.sock);
+	sock_tcp_disconnect(&psock);
 	return EXIT_SUCCESS;
 }

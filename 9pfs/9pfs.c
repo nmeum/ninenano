@@ -1,6 +1,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "9p.h"
 #include "vfs.h"
@@ -47,7 +48,6 @@ _9pfs_mount(vfs_mount_t *mountp)
 
 	ctx = mountp->private_data;
 
-	_9pinit(ctx);
 	if ((r = _9pversion(ctx)))
 		return r;
 	if ((r = _9pattach(ctx, &f, "foobar", NULL)))
