@@ -1,8 +1,8 @@
 # Name of your application
 APPLICATION = 9pfs-shell
 
-# Run tests of native only
-BOARD = native
+# Board for which the application should be compiled
+BOARD ?= native
 
 # Change this to 0 show compiler invocation lines
 QUIET ?= 1
@@ -23,8 +23,5 @@ USEMODULE += lwip_ethernet lwip_netdev
 USEMODULE += lwip_sock_tcp
 USEMODULE += netdev_default
 USEMODULE += ps
-
-# Module required for unit test functions
-USEMODULE += embunit
 
 include $(RIOTBASE)/Makefile.include
