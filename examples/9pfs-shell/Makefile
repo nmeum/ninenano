@@ -4,6 +4,9 @@ APPLICATION = 9pfs-shell
 # Board for which the application should be compiled
 BOARD ?= native
 
+# Disable optional assert(3) checks
+CFLAGS += -DNDEBUG
+
 # Change this to 0 show compiler invocation lines
 QUIET ?= 1
 
