@@ -42,6 +42,8 @@
 void
 advbuf(_9ppkt *pkt, size_t off)
 {
+	assert(pkt->len - off <= pkt->len);
+
 	pkt->buf += off;
 	pkt->len -= off;
 }

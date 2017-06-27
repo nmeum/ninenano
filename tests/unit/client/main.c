@@ -163,7 +163,10 @@ test_9putil_hstring_invalid3(void)
 	pkt.len = 5;
 
 	TEST_ASSERT_EQUAL_INT(0, pstring("foo", &pkt));
+
 	pkt.buf = buf;
+	pkt.len = 5;
+
 	htop16(42, &pkt);
 
 	TEST_ASSERT_EQUAL_INT(-1, hstring(dest, 5, &pkt));
