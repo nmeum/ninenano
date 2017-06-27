@@ -527,7 +527,7 @@ test_9p__rread_success(void)
 }
 
 static void
-test_9p__rread_with_offset(void)
+test_9p__rread_with_offset1(void)
 {
 	_9pfid f;
 	ssize_t ret;
@@ -548,6 +548,34 @@ test_9p__rread_with_offset(void)
 
 	dest[ret] = '\0';
 	TEST_ASSERT_EQUAL_STRING("1234567890", (char*)dest);
+}
+
+static void
+test_9p__rread_with_offset2(void)
+{
+	_9pfid f;
+	ssize_t ret;
+	char dest[6];
+
+	setcmd("rread_with_offset\n");
+
+	f.fid = 42;
+	f.off = 0;
+	f.iounit = 9999;
+
+	ret = _9pread(&ctx, &f, dest, 5);
+	dest[ret] = '\0';
+
+	TEST_ASSERT_EQUAL_INT(5, ret);
+	TEST_ASSERT_EQUAL_STRING("12345", (char*)dest);
+
+	setcmd("rread_with_offset\n");
+
+	ret = _9pread(&ctx, &f, dest, 5);
+	dest[ret] = '\0';
+
+	TEST_ASSERT_EQUAL_INT(5, ret);
+	TEST_ASSERT_EQUAL_STRING("67890", (char*)dest);
 }
 
 static void
@@ -684,7 +712,8 @@ tests_9p_tests(void)
 		new_TestFixture(test_9p__rcreate_success),
 
 		new_TestFixture(test_9p__rread_success),
-		new_TestFixture(test_9p__rread_with_offset),
+		new_TestFixture(test_9p__rread_with_offset1),
+		new_TestFixture(test_9p__rread_with_offset2),
 		new_TestFixture(test_9p__rread_count_zero),
 		new_TestFixture(test_9p__rread_with_larger_count),
 
