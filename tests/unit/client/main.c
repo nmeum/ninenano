@@ -124,7 +124,7 @@ test_9putil_hstring_invalid1(void)
 	char dest[10];
 
 	pkt.buf = buf;
-	pkt.len = BIT16SZ - 1;
+	pkt.len = 10;
 
 	TEST_ASSERT_EQUAL_INT(0, pstring("kek", &pkt));
 

@@ -253,6 +253,30 @@ ptoh64(uint64_t *dest, _9ppkt *pkt)
  */
 
 /**
+ * Does the same thing as ::pstring except for the fact that this
+ * function takes a string length parameter and therefore also works on
+ * strings which are not null-terminated.
+ *
+ * @param str Pointer to a buffer containing a string.
+ * @param len Length of the string contained in the buffer.
+ * @param pkt Pointer to a packet to which the resulting string should
+ * 	be written.
+ * @return `0` on success.
+ * @return `-1` on failure.
+ */
+int
+pnstring(char *str, size_t len, _9ppkt *pkt)
+{
+	if (len + BIT16SZ > pkt->len)
+		return -1;
+
+	htop16((uint16_t)len, pkt);
+	if (len) bufcpy(pkt, str, len);
+
+	return 0;
+}
+
+/**
  * From intro(5):
  *   The notation string[s] (using a literal s character) is shorthand
  *   for s[2] followed by s bytes of UTF-8 text.
@@ -267,8 +291,6 @@ ptoh64(uint64_t *dest, _9ppkt *pkt)
  * @param str Pointer to the null-terminated string.
  * @param pkt Pointer to a packet to which the resulting string should
  * 	be written.
- * @return Pointer to memory location in `buf` right behind the newly
- *   written string.
  * @return `0` on success.
  * @return `-1` on failure.
  */
@@ -277,22 +299,8 @@ pstring(char *str, _9ppkt *pkt)
 {
 	size_t len;
 
-	if (!str) {
-		if (BIT16SZ > pkt->len)
-			return -1;
-
-		len = _9p_swap(0, s);
-		htop16(len, pkt);
-		return 0;
-	}
-
-	len = strlen(str);
-	if (len > pkt->len - BIT16SZ)
-		return -1;
-
-	htop16((uint16_t)len, pkt);
-	bufcpy(pkt, str, len);
-	return 0;
+	len = (str) ? strlen(str) : 0;
+	return pnstring(str, len, pkt);
 }
 
 /**

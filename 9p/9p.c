@@ -650,15 +650,9 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 		cur = &path[i];
 		if (!(sep = strchr(cur, _9P_PATHSEP)))
 			sep = &path[len - 1] + 1; /* XXX */
-
 		elen = sep - cur;
-		if ((size_t)elen > pkt.len - BIT32SZ) {
-			r = -EOVERFLOW;
-			goto err;
-		}
 
-		htop16(elen, &pkt);
-		bufcpy(&pkt, cur, elen);
+		pnstring(cur, elen, &pkt);
 	}
 
 	DEBUG("Constructed Twalk with %zu elements\n", n);

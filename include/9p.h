@@ -412,6 +412,7 @@ _9pfid* fidtbl(_9pfid*, uint32_t, _9pfidop);
 _9pfid* newfid(_9pfid*);
 
 int pstring(char*, _9ppkt*);
+int pnstring(char*, size_t, _9ppkt*);
 int hstring(char*, uint16_t, _9ppkt*);
 int hqid(_9pqid*, _9ppkt*);
 
