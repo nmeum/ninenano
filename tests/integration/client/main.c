@@ -112,7 +112,7 @@ test_9pfs__lseek_and_read(void)
 }
 
 static void
-test_9pfs_create_and_delete(void)
+test_9pfs__create_and_delete(void)
 {
 	int fd;
 	struct stat buf;
@@ -208,7 +208,7 @@ tests_9pfs_tests(void)
 	EMB_UNIT_TESTFIXTURES(fixtures) {
 		new_TestFixture(test_9pfs__read),
 		new_TestFixture(test_9pfs__lseek_and_read),
-		new_TestFixture(test_9pfs_create_and_delete),
+		new_TestFixture(test_9pfs__create_and_delete),
 		new_TestFixture(test_9pfs__write_lseek_and_read),
 		new_TestFixture(test_9pfs__create_and_remove_directory),
 		new_TestFixture(test_9pfs__opendir_and_closedir),
