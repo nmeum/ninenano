@@ -65,7 +65,7 @@ test_9pfs__create_and_remove_directory(void)
 {
 	struct stat st;
 
-	TEST_ASSERT_EQUAL_INT(0, vfs_mkdir("/mnt/foo/wtf", 777));
+	TEST_ASSERT_EQUAL_INT(0, vfs_mkdir("/mnt/foo/wtf", S_IRUSR|S_IWUSR));
 	TEST_ASSERT_EQUAL_INT(0, vfs_rmdir("/mnt/foo/wtf"));
 
 	TEST_ASSERT(vfs_stat("/mnt/foo/wtf", &st) != 0);
@@ -78,7 +78,7 @@ test_9pfs__read(void)
 	ssize_t n;
 	char dest[MAXSIZ];
 
-	fd = vfs_open("/mnt/foo/bar/hello", OREAD, 644);
+	fd = vfs_open("/mnt/foo/bar/hello", OREAD, S_IRUSR|S_IWUSR);
 	TEST_ASSERT(fd >= 0);
 
 	n = vfs_read(fd, dest, MAXSIZ - 1);
@@ -97,7 +97,7 @@ test_9pfs__lseek_and_read(void)
 	ssize_t n;
 	char dest[MAXSIZ];
 
-	fd = vfs_open("/mnt/foo/bar/hello", OREAD, 644);
+	fd = vfs_open("/mnt/foo/bar/hello", OREAD, S_IRUSR|S_IWUSR);
 	TEST_ASSERT(fd >= 0);
 
 	TEST_ASSERT_EQUAL_INT(6, vfs_lseek(fd, 6, SEEK_SET));
@@ -117,7 +117,7 @@ test_9pfs__create_and_delete(void)
 	int fd;
 	struct stat buf;
 
-	fd = vfs_open("/mnt/foo/falafel", O_RDWR|O_CREAT, 644);
+	fd = vfs_open("/mnt/foo/falafel", O_RDWR|O_CREAT, S_IRUSR|S_IWUSR);
 	TEST_ASSERT(fd >= 0);
 
 	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
@@ -134,7 +134,7 @@ test_9pfs__write_lseek_and_read(void)
 	char *str = "foobar";
 	char dest[7];
 
-	fd = vfs_open("/mnt/writeme", O_RDWR|O_TRUNC, 644);
+	fd = vfs_open("/mnt/writeme", O_RDWR|O_TRUNC, S_IRUSR|S_IWUSR);
 	TEST_ASSERT(fd >= 0);
 
 	n = vfs_write(fd, str, 6);
