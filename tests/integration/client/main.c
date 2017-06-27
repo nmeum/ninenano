@@ -22,13 +22,6 @@
 #include "../../util.h"
 
 /**
- * Various global variables.
- */
-enum {
-	MAXSIZ = 128, /**< Maximum size of buffers located on the stack. */
-};
-
-/**
  * 9P connection context.
  */
 static _9pctx ctx;
@@ -76,12 +69,12 @@ test_9pfs__read(void)
 {
 	int fd;
 	ssize_t n;
-	char dest[MAXSIZ];
+	char dest[BUFSIZ];
 
 	fd = vfs_open("/mnt/foo/bar/hello", OREAD, S_IRUSR|S_IWUSR);
 	TEST_ASSERT(fd >= 0);
 
-	n = vfs_read(fd, dest, MAXSIZ - 1);
+	n = vfs_read(fd, dest, BUFSIZ - 1);
 	TEST_ASSERT_EQUAL_INT(13, n);
 
 	dest[n] = '\0';
@@ -95,14 +88,14 @@ test_9pfs__lseek_and_read(void)
 {
 	int fd;
 	ssize_t n;
-	char dest[MAXSIZ];
+	char dest[BUFSIZ];
 
 	fd = vfs_open("/mnt/foo/bar/hello", OREAD, S_IRUSR|S_IWUSR);
 	TEST_ASSERT(fd >= 0);
 
 	TEST_ASSERT_EQUAL_INT(6, vfs_lseek(fd, 6, SEEK_SET));
 
-	n = vfs_read(fd, dest, MAXSIZ - 1);
+	n = vfs_read(fd, dest, BUFSIZ - 1);
 	TEST_ASSERT_EQUAL_INT(7, n);
 
 	dest[n] = '\0';
