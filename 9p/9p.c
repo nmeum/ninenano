@@ -1,8 +1,10 @@
 #include <assert.h>
 #include <errno.h>
-#include <byteorder.h>
 #include <string.h>
 #include <fcntl.h>
+#include <unistd.h>
+
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include "xtimer.h"

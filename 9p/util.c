@@ -1,11 +1,11 @@
 #include <assert.h>
 #include <string.h>
-#include <byteorder.h>
 
 #include <sys/types.h>
 
 #include "9p.h"
 #include "random.h"
+#include "byteorder.h"
 
 /**
  * From intro(5):
