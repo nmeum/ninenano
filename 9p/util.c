@@ -334,9 +334,7 @@ hstring(char *dest, uint16_t n, _9ppkt *pkt)
 	memcpy(dest, pkt->buf, siz);
 	dest[siz] = '\0';
 
-	pkt->buf += siz;
-	pkt->len -= siz;
-
+	advbuf(pkt, siz);
 	return 0;
 }
 
