@@ -16,29 +16,17 @@
 #include "net/sock/tcp.h"
 
 #include "embUnit.h"
+#include "../../util.h"
 
 /**
- * Retrieve value of environment variable using getenv(3) and return
- * `EXIT_FAILURE` if the result was a NULL pointer.
- *
- * @param VAR Name of the variable to store result in.
- * @param ENV Name of the environment variable.
- */
-#define GETENV(VAR, ENV) \
-	do { if (!(VAR = getenv(ENV))) { \
-		fprintf(stderr, "%s is not set or empty\n", ENV); \
-		return EXIT_FAILURE; } \
-	} while (0)
-
-/**
- * TCP control socket
+ * TCP control socket.
  */
 static sock_tcp_t csock;
 
 /**
- * 9P fid table
+ * Global 9P connection context.
  */
-extern _9pfid fids[_9P_MAXFIDS];
+static _9pctx ctx;
 
 static void
 setcmd(char *cmd)
@@ -51,7 +39,7 @@ setcmd(char *cmd)
 static void
 tear_down(void)
 {
-	memset(fids, '\0', _9P_MAXFIDS * sizeof(_9pfid));
+	memset(ctx.fids, 0, _9P_MAXFIDS * sizeof(_9pfid));
 }
 
 static void
@@ -136,7 +124,7 @@ test_9putil_hstring_invalid1(void)
 	char dest[10];
 
 	pkt.buf = buf;
-	pkt.len = BIT16SZ - 1;
+	pkt.len = 10;
 
 	TEST_ASSERT_EQUAL_INT(0, pstring("kek", &pkt));
 
@@ -175,7 +163,10 @@ test_9putil_hstring_invalid3(void)
 	pkt.len = 5;
 
 	TEST_ASSERT_EQUAL_INT(0, pstring("foo", &pkt));
+
 	pkt.buf = buf;
+	pkt.len = 5;
+
 	htop16(42, &pkt);
 
 	TEST_ASSERT_EQUAL_INT(-1, hstring(dest, 5, &pkt));
@@ -186,7 +177,7 @@ test_9putil_fidtbl_add(void)
 {
 	_9pfid *f;
 
-	f = fidtbl(23, ADD);
+	f = fidtbl(ctx.fids, 23, ADD);
 
 	TEST_ASSERT_NOT_NULL(f);
 	TEST_ASSERT_EQUAL_INT(0, f->fid);
@@ -195,7 +186,7 @@ test_9putil_fidtbl_add(void)
 static void
 test_9putil_fidtbl_add_invalid(void)
 {
-	TEST_ASSERT_NULL(fidtbl(0, ADD));
+	TEST_ASSERT_NULL(fidtbl(ctx.fids, 0, ADD));
 }
 
 static void
@@ -205,11 +196,11 @@ test_9putil_fidtbl_add_full(void)
 	size_t i;
 
 	for (i = 1; i <= _9P_MAXFIDS; i++) {
-		f = fidtbl(i, ADD);
+		f = fidtbl(ctx.fids, i, ADD);
 		f->fid = i;
 	}
 
-	TEST_ASSERT_NULL(fidtbl(++i, ADD));
+	TEST_ASSERT_NULL(fidtbl(ctx.fids, ++i, ADD));
 }
 
 static void
@@ -217,10 +208,10 @@ test_9putil_fidtbl_get(void)
 {
 	_9pfid *f1, *f2;
 
-	f1 = fidtbl(42, ADD);
+	f1 = fidtbl(ctx.fids, 42, ADD);
 	f1->fid = 42;
 
-	f2 = fidtbl(42, GET);
+	f2 = fidtbl(ctx.fids, 42, GET);
 
 	TEST_ASSERT_NOT_NULL(f2);
 	TEST_ASSERT_EQUAL_INT(42, f2->fid);
@@ -231,21 +222,21 @@ test_9putil_fidtbl_delete(void)
 {
 	_9pfid *f1, *f2;
 
-	f1 = fidtbl(1337, ADD);
+	f1 = fidtbl(ctx.fids, 1337, ADD);
 	f1->fid = 1337;
 
-	f2 = fidtbl(1337, DEL);
+	f2 = fidtbl(ctx.fids, 1337, DEL);
 
 	TEST_ASSERT_NOT_NULL(f2);
 	TEST_ASSERT_EQUAL_INT(0, f2->fid);
-	TEST_ASSERT_NULL(fidtbl(1337, GET));
+	TEST_ASSERT_NULL(fidtbl(ctx.fids, 1337, GET));
 }
 
 static void
 test_9putil_fidtbl_delete_rootfid(void)
 {
-	fidtbl(_9P_ROOTFID, ADD);
-	TEST_ASSERT_NULL(fidtbl(_9P_ROOTFID, DEL));
+	fidtbl(ctx.fids, _9P_ROOTFID, ADD);
+	TEST_ASSERT_NULL(fidtbl(ctx.fids, _9P_ROOTFID, DEL));
 }
 
 static void
@@ -253,10 +244,10 @@ test_9putil__newfid(void)
 {
 	_9pfid *f1, *f2;
 
-	f1 = newfid();
+	f1 = newfid(ctx.fids);
 	TEST_ASSERT_NOT_NULL(f1);
 
-	f2 = fidtbl(f1->fid, GET);
+	f2 = fidtbl(ctx.fids, f1->fid, GET);
 	TEST_ASSERT_NOT_NULL(f2);
 
 	TEST_ASSERT_EQUAL_INT(f1->fid, f2->fid);
@@ -306,92 +297,92 @@ tests_9putil_tests(void)
 static void
 test_9p__header_too_short1(void)
 {
-	setcmd("test_9p__header_too_short1\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	setcmd("header_too_short1\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
 test_9p__header_too_short2(void)
 {
-	setcmd("test_9p__header_too_short2\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	setcmd("header_too_short2\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
 test_9p__header_too_large(void)
 {
 	setcmd("header_too_large\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
 test_9p__header_wrong_type(void)
 {
 	setcmd("header_wrong_type\n");
-	TEST_ASSERT_EQUAL_INT(-ENOTSUP, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-ENOTSUP, _9pversion(&ctx));
 }
 
 static void
 test_9p__header_invalid_type(void)
 {
 	setcmd("header_invalid_type\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
 test_9p__header_tag_mismatch(void)
 {
 	setcmd("header_tag_mismatch\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
 test_9p__header_type_mismatch(void)
 {
 	setcmd("header_type_mismatch\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
 test_9p__rversion_success(void)
 {
 	setcmd("rversion_success\n");
-	TEST_ASSERT_EQUAL_INT(0, _9pversion());
+	TEST_ASSERT_EQUAL_INT(0, _9pversion(&ctx));
 }
 
 static void
 test_9p__rversion_unknown(void)
 {
 	setcmd("rversion_unknown\n");
-	TEST_ASSERT_EQUAL_INT(-ENOPROTOOPT, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-ENOPROTOOPT, _9pversion(&ctx));
 }
 
 static void
 test_9p__rversion_msize_too_big(void)
 {
 	setcmd("rversion_msize_too_big\n");
-	TEST_ASSERT_EQUAL_INT(-EMSGSIZE, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-EMSGSIZE, _9pversion(&ctx));
 }
 
 static void
 test_9p__rversion_invalid(void)
 {
 	setcmd("rversion_invalid\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
 test_9p__rversion_invalid_len(void)
 {
 	setcmd("rversion_invalid_len\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
 test_9p__rversion_version_too_long(void)
 {
 	setcmd("rversion_version_too_long\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion());
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void
@@ -400,7 +391,7 @@ test_9p__rattach_success(void)
 	_9pfid *fid;
 
 	setcmd("rattach_success\n");
-	TEST_ASSERT_EQUAL_INT(0, _9pattach(&fid, "foo", NULL));
+	TEST_ASSERT_EQUAL_INT(0, _9pattach(&ctx, &fid, "foo", NULL));
 	TEST_ASSERT(fid->fid > 0);
 }
 
@@ -410,7 +401,7 @@ test_9p__rattach_invalid_len(void)
 	_9pfid *fid;
 
 	setcmd("rattach_invalid_len\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pattach(&fid, "foobar", NULL));
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pattach(&ctx, &fid, "foobar", NULL));
 }
 
 static void
@@ -420,7 +411,7 @@ test_9p__rstat_success(void)
 	struct stat st;
 
 	setcmd("rstat_success\n");
-	TEST_ASSERT_EQUAL_INT(0, _9pstat(&f, &st));
+	TEST_ASSERT_EQUAL_INT(0, _9pstat(&ctx, &f, &st));
 
 	TEST_ASSERT_EQUAL_INT(23, f.qid.type);
 	TEST_ASSERT_EQUAL_INT(2342, f.qid.vers);
@@ -448,7 +439,7 @@ test_9p__rwalk_success(void)
 	_9pfid *f;
 
 	setcmd("rwalk_success\n");
-	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&f, "foo/bar"));
+	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&ctx, &f, "foo/bar"));
 
 	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
 	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
@@ -461,7 +452,7 @@ test_9p__rwalk_rootfid(void)
 	_9pfid *f;
 
 	setcmd("rwalk_success\n");
-	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&f, "/"));
+	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&ctx, &f, "/"));
 
 	TEST_ASSERT(f->fid != _9P_ROOTFID);
 }
@@ -472,7 +463,7 @@ test_9p__rwalk_invalid_len(void)
 	_9pfid *f;
 
 	setcmd("rwalk_invalid_len\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&f, "foobar"));
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&ctx, &f, "foobar"));
 }
 
 static void
@@ -482,7 +473,7 @@ test_9p__rwalk_path_too_long(void)
 	char *path;
 
 	path = "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17";
-	TEST_ASSERT_EQUAL_INT(-ENAMETOOLONG, _9pwalk(&f, path));
+	TEST_ASSERT_EQUAL_INT(-ENAMETOOLONG, _9pwalk(&ctx, &f, path));
 }
 
 static void
@@ -491,7 +482,7 @@ test_9p__rwalk_nwqid_too_large(void)
 	_9pfid *f;
 
 	setcmd("rwalk_nwqid_too_large\n");
-	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&f, "foo"));
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&ctx, &f, "foo"));
 }
 
 static void
@@ -502,7 +493,7 @@ test_9p__ropen_success(void)
 	f.fid = 42;
 
 	setcmd("ropen_success\n");
-	TEST_ASSERT_EQUAL_INT(0, _9popen(&f, 0));
+	TEST_ASSERT_EQUAL_INT(0, _9popen(&ctx, &f, 0));
 	TEST_ASSERT_EQUAL_INT(1337, f.iounit);
 }
 
@@ -514,7 +505,7 @@ test_9p__rcreate_success(void)
 	f.fid = 4223;
 
 	setcmd("rcreate_success\n");
-	TEST_ASSERT_EQUAL_INT(0, _9pcreate(&f, "hurrdurr", ORDWR, 0));
+	TEST_ASSERT_EQUAL_INT(0, _9pcreate(&ctx, &f, "hurrdurr", ORDWR, 0));
 	TEST_ASSERT_EQUAL_INT(9001, f.iounit);
 }
 
@@ -531,7 +522,7 @@ test_9p__rread_success(void)
 	f.off = 0;
 	f.iounit = 50;
 
-	ret = _9pread(&f, dest, 6);
+	ret = _9pread(&ctx, &f, dest, 6);
 	TEST_ASSERT_EQUAL_INT(6, ret);
 
 	dest[ret] = '\0';
@@ -539,7 +530,7 @@ test_9p__rread_success(void)
 }
 
 static void
-test_9p__rread_with_offset(void)
+test_9p__rread_with_offset1(void)
 {
 	_9pfid f;
 	ssize_t ret;
@@ -555,11 +546,39 @@ test_9p__rread_with_offset(void)
 	f.off = 0;
 	f.iounit = 5;
 
-	ret = _9pread(&f, dest, 10);
+	ret = _9pread(&ctx, &f, dest, 10);
 	TEST_ASSERT_EQUAL_INT(10, ret);
 
 	dest[ret] = '\0';
 	TEST_ASSERT_EQUAL_STRING("1234567890", (char*)dest);
+}
+
+static void
+test_9p__rread_with_offset2(void)
+{
+	_9pfid f;
+	ssize_t ret;
+	char dest[6];
+
+	setcmd("rread_with_offset\n");
+
+	f.fid = 42;
+	f.off = 0;
+	f.iounit = 9999;
+
+	ret = _9pread(&ctx, &f, dest, 5);
+	dest[ret] = '\0';
+
+	TEST_ASSERT_EQUAL_INT(5, ret);
+	TEST_ASSERT_EQUAL_STRING("12345", (char*)dest);
+
+	setcmd("rread_with_offset\n");
+
+	ret = _9pread(&ctx, &f, dest, 5);
+	dest[ret] = '\0';
+
+	TEST_ASSERT_EQUAL_INT(5, ret);
+	TEST_ASSERT_EQUAL_STRING("67890", (char*)dest);
 }
 
 static void
@@ -574,7 +593,7 @@ test_9p__rread_count_zero(void)
 	f.off = 0;
 	f.iounit = 1337;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pread(&f, dest, 10));
+	TEST_ASSERT_EQUAL_INT(0, _9pread(&ctx, &f, dest, 10));
 }
 
 static void
@@ -590,7 +609,7 @@ test_9p__rread_with_larger_count(void)
 	f.off = 0;
 	f.iounit = 100;
 
-	ret = _9pread(&f, dest, 100);
+	ret = _9pread(&ctx, &f, dest, 100);
 	TEST_ASSERT_EQUAL_INT(6, ret);
 
 	dest[ret] = '\0';
@@ -610,8 +629,7 @@ test_9p__rwrite_success(void)
 	f.iounit = 50;
 
 	l = strlen(str);
-	TEST_ASSERT_EQUAL_INT(l, _9pwrite(&f, str, l));
-
+	TEST_ASSERT_EQUAL_INT(l, _9pwrite(&ctx, &f, str, l));
 }
 
 static void
@@ -621,10 +639,10 @@ test_9p__rclunk_success(void)
 
 	setcmd("rclunk_success\n");
 
-	f = fidtbl(23, ADD);
+	f = fidtbl(ctx.fids, 23, ADD);
 	f->fid = 23;
 
-	TEST_ASSERT_EQUAL_INT(0, _9pclunk(f));
+	TEST_ASSERT_EQUAL_INT(0, _9pclunk(&ctx, f));
 }
 
 static void
@@ -635,7 +653,7 @@ test_9p__rclunk_bad_fid(void)
 	setcmd("rclunk_success\n");
 
 	f.fid = 42;
-	TEST_ASSERT_EQUAL_INT(-EBADF, _9pclunk(&f));
+	TEST_ASSERT_EQUAL_INT(-EBADF, _9pclunk(&ctx, &f));
 }
 
 static void
@@ -645,10 +663,10 @@ test_9p__rremove_success(void)
 
 	setcmd("remove_success\n");
 
-	f = fidtbl(9, ADD);
+	f = fidtbl(ctx.fids, 9, ADD);
 	f->fid = 9;
 
-	TEST_ASSERT_EQUAL_INT(0, _9premove(f));
+	TEST_ASSERT_EQUAL_INT(0, _9premove(&ctx, f));
 }
 
 static void
@@ -659,7 +677,7 @@ test_9p__rremove_bad_fid(void)
 	setcmd("remove_success\n");
 
 	f.fid = 5;
-	TEST_ASSERT_EQUAL_INT(-EBADF, _9premove(&f));
+	TEST_ASSERT_EQUAL_INT(-EBADF, _9premove(&ctx, &f));
 }
 
 Test*
@@ -697,7 +715,8 @@ tests_9p_tests(void)
 		new_TestFixture(test_9p__rcreate_success),
 
 		new_TestFixture(test_9p__rread_success),
-		new_TestFixture(test_9p__rread_with_offset),
+		new_TestFixture(test_9p__rread_with_offset1),
+		new_TestFixture(test_9p__rread_with_offset2),
 		new_TestFixture(test_9p__rread_count_zero),
 		new_TestFixture(test_9p__rread_with_larger_count),
 
@@ -740,15 +759,13 @@ main(void)
 	pr.port = atoi(pport);
 	cr.port = atoi(cport);
 
-	if (sock_tcp_connect(&csock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0) {
-		puts("Couldn't connect to control server");
+	if (sock_tcp_connect(&csock, &cr, 0, SOCK_FLAGS_REUSE_EP) < 0
+			|| sock_tcp_connect(&psock, &pr, 0, SOCK_FLAGS_REUSE_EP) < 0) {
+		fprintf(stderr, "Couldn't connect to server\n");
 		return EXIT_FAILURE;
 	}
 
-	if (_9pinit(&pr)) {
-		puts("_9pinit failed");
-		return EXIT_FAILURE;
-	}
+	_9pinit(&ctx, recvfn, sendfn);
 
 	TESTS_START();
 	TESTS_RUN(tests_9putil_tests());
@@ -756,7 +773,7 @@ main(void)
 	TESTS_END();
 
 	sock_tcp_disconnect(&csock);
-	_9pclose();
+	sock_tcp_disconnect(&psock);
 
 	return EXIT_SUCCESS;
 }

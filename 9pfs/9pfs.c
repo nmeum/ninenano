@@ -1,6 +1,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "9p.h"
 #include "vfs.h"
@@ -43,17 +44,13 @@ _9pfs_mount(vfs_mount_t *mountp)
 {
 	int r;
 	_9pfid *f;
-	sock_tcp_ep_t *ep;
+	_9pctx *ctx;
 
-	if (!mountp->private_data)
-		return -EINVAL;
-	ep = (sock_tcp_ep_t*)mountp->private_data;
+	ctx = mountp->private_data;
 
-	if ((r = _9pinit(ep)))
+	if ((r = _9pversion(ctx)))
 		return r;
-	if ((r = _9pversion()))
-		return r;
-	if ((r = _9pattach(&f, "foobar", NULL)))
+	if ((r = _9pattach(ctx, &f, "foobar", NULL)))
 		return r;
 
 	(void)f;
@@ -65,7 +62,6 @@ _9pfs_umount(vfs_mount_t *mountp)
 {
 	(void)mountp;
 
-	_9pclose();
 	return 0;
 }
 
@@ -73,12 +69,13 @@ static int
 _9pfs_unlink(vfs_mount_t *mountp, const char *name)
 {
 	_9pfid *f;
+	_9pctx *ctx;
 
-	(void)mountp;
+	ctx = mountp->private_data;
 
-	if (_9pwalk(&f, (char*)name))
+	if (_9pwalk(ctx, &f, (char*)name))
 		return -ENOENT;
-	if (_9premove(f))
+	if (_9premove(ctx, f))
 		return -EACCES;
 
 	return 0;
@@ -90,27 +87,28 @@ _9pfs_mkdir(vfs_mount_t *mountp, const char *name, mode_t mode)
 	_9pfid *f;
 	char buf[VFS_NAME_MAX + 1];
 	char *dname, *bname;
+	_9pctx *ctx;
 
-	(void)mountp;
+	ctx = mountp->private_data;
 
-	if (!_9pwalk(&f, (char*)name)) {
-		_9pclunk(f);
+	if (!_9pwalk(ctx, &f, (char*)name)) {
+		_9pclunk(ctx, f);
 		return -EEXIST;
 	}
 
 	bname = breakpath(buf, sizeof(buf), name, &dname);
 	DEBUG("Creating directory '%s' in directory '%s'\n", bname, dname);
 
-	if (_9pwalk(&f, dname))
+	if (_9pwalk(ctx, &f, dname))
 		return -EACCES;
 
 	mode &= 0777;
 	mode |= DMDIR;
 
-	if (_9pcreate(f, bname, mode, OREAD))
+	if (_9pcreate(ctx, f, bname, mode, OREAD))
 		return -EACCES;
 
-	_9pclunk(f);
+	_9pclunk(ctx, f);
 	return 0;
 }
 
@@ -124,15 +122,16 @@ static int
 _9pfs_stat(vfs_mount_t *mountp, const char *restrict name, struct stat *restrict buf)
 {
 	_9pfid *f;
+	_9pctx *ctx;
 
-	(void)mountp;
+	ctx = mountp->private_data;
 
-	if (_9pwalk(&f, (char*)name))
+	if (_9pwalk(ctx, &f, (char*)name))
 		return -ENOENT;
-	if (_9pstat(f, buf))
+	if (_9pstat(ctx, f, buf))
 		return -EACCES;
 
-	_9pclunk(f);
+	_9pclunk(ctx, f);
 	return 0;
 }
 
@@ -148,17 +147,14 @@ static int
 _9pfs_close(vfs_file_t *filp)
 {
 	_9pfid *f;
+	_9pctx *ctx;
 
 	f = filp->private_data.ptr;
+	ctx = filp->mp->private_data;
 
-	if (_9pclunk(f) == -EBADF)
+	if (_9pclunk(ctx, f) == -EBADF)
 		return -EBADF;
 
-	/* From clunk(5):
-	 *   Even if the clunk returns an error, the fid is no longer
-	 *   valid.
-	 */
-	filp->private_data.ptr = NULL;
 	return 0;
 }
 
@@ -166,10 +162,12 @@ static int
 _9pfs_fstat(vfs_file_t *filp, struct stat *buf)
 {
 	_9pfid *f;
+	_9pctx *ctx;
 
 	f = filp->private_data.ptr;
+	ctx = filp->mp->private_data;
 
-	if (_9pstat(f, buf))
+	if (_9pstat(ctx, f, buf))
 		return -EACCES;
 
 	return 0;
@@ -178,9 +176,11 @@ _9pfs_fstat(vfs_file_t *filp, struct stat *buf)
 static off_t _9pfs_lseek(vfs_file_t *filp, off_t off, int whence)
 {
 	_9pfid *f;
+	_9pctx *ctx;
 	struct stat st;
 
 	f = filp->private_data.ptr;
+	ctx = filp->mp->private_data;
 
 	switch (whence) {
 		case SEEK_SET:
@@ -189,7 +189,7 @@ static off_t _9pfs_lseek(vfs_file_t *filp, off_t off, int whence)
 			off += f->off;
 			break;
 		case SEEK_END:
-			if (_9pstat(f, &st))
+			if (_9pstat(ctx, f, &st))
 				return -EINVAL;
 
 			off += st.st_size;
@@ -210,10 +210,13 @@ _9pfs_open(vfs_file_t *filp, const char *name, int flags, mode_t mode, const cha
 {
 	int fl;
 	_9pfid *f;
+	_9pctx *ctx;
 	char buf[VFS_NAME_MAX + 1];
 	char *bname, *dname;
 
 	(void)abs_path;
+
+	ctx = filp->mp->private_data;
 
 	/* Convert the mode. This assumes that OREAD == O_RDONLY,
 	 * O_WRONLY == OWRITE and O_RDWR == ORDWR which should always be
@@ -222,9 +225,9 @@ _9pfs_open(vfs_file_t *filp, const char *name, int flags, mode_t mode, const cha
 	if (flags & O_TRUNC)
 		fl |= OTRUNC;
 
-	if (!_9pwalk(&f, (char*)name)) {
-		if (_9popen(f, fl)) {
-			_9pclunk(f);
+	if (!_9pwalk(ctx, &f, (char*)name)) {
+		if (_9popen(ctx, f, fl)) {
+			_9pclunk(ctx, f);
 			return -EACCES;
 		}
 
@@ -232,11 +235,11 @@ _9pfs_open(vfs_file_t *filp, const char *name, int flags, mode_t mode, const cha
 		return 0;
 	} else if (flags & O_CREAT) {
 		bname = breakpath(buf, sizeof(buf), name, &dname);
-		if (_9pwalk(&f, dname))
+		if (_9pwalk(ctx, &f, dname))
 			return -ENOENT;
 
-		if (_9pcreate(f, bname, mode, flags)) {
-			_9pclunk(f);
+		if (_9pcreate(ctx, f, bname, mode, flags)) {
+			_9pclunk(ctx, f);
 			return -EACCES;
 		}
 
@@ -252,10 +255,12 @@ _9pfs_read(vfs_file_t *filp, void *dest, size_t nbytes)
 {
 	ssize_t ret;
 	_9pfid *f;
+	_9pctx *ctx;
 
 	f = filp->private_data.ptr;
+	ctx = filp->mp->private_data;
 
-	if ((ret = _9pread(f, dest, nbytes)) < 0)
+	if ((ret = _9pread(ctx, f, dest, nbytes)) < 0)
 		return -EIO;
 
 	return ret;
@@ -266,10 +271,12 @@ _9pfs_write(vfs_file_t *filp, const void *src, size_t nbytes)
 {
 	ssize_t ret;
 	_9pfid *f;
+	_9pctx *ctx;
 
 	f = filp->private_data.ptr;
+	ctx = filp->mp->private_data;
 
-	if ((ret = _9pwrite(f, (void*)src, nbytes)) < 0)
+	if ((ret = _9pwrite(ctx, f, (void*)src, nbytes)) < 0)
 		return -EIO;
 
 	return ret;
@@ -287,19 +294,22 @@ static int
 _9pfs_opendir(vfs_DIR *dirp, const char *dirname, const char *abs_path)
 {
 	_9pfid *f;
+	_9pctx *ctx;
 
 	(void)abs_path;
 
-	if (_9pwalk(&f, (char*)dirname))
+	ctx = dirp->mp->private_data;
+
+	if (_9pwalk(ctx, &f, (char*)dirname))
 		return -ENOENT;
 
-	if (_9popen(f, OREAD)) {
-		_9pclunk(f);
+	if (_9popen(ctx, f, OREAD)) {
+		_9pclunk(ctx, f);
 		return -EACCES;
 	}
 
 	if (!(f->qid.type & QTDIR)) {
-		_9pclunk(f);
+		_9pclunk(ctx, f);
 		return -ENOTDIR;
 	}
 
@@ -310,14 +320,16 @@ _9pfs_opendir(vfs_DIR *dirp, const char *dirname, const char *abs_path)
 static int
 _9pfs_readdir(vfs_DIR *dirp, vfs_dirent_t *entry)
 {
+	ssize_t n;
 	_9pfid *f;
 	_9ppkt pkt;
-	ssize_t n;
+	_9pctx *ctx;
 	char dest[_9P_STATSIZ + VFS_NAME_MAX + 1];
 
 	f = dirp->private_data.ptr;
+	ctx = dirp->mp->private_data;
 
-	if ((n = _9pread(f, dest, sizeof(dest))) < 0)
+	if ((n = _9pread(ctx, f, dest, sizeof(dest))) < 0)
 		return -EIO;
 	else if (n == 0)
 		return 0;
@@ -338,13 +350,14 @@ static int
 _9pfs_closedir(vfs_DIR *dirp)
 {
 	_9pfid *f;
+	_9pctx *ctx;
 
 	f = dirp->private_data.ptr;
+	ctx = dirp->mp->private_data;
 
-	if (_9pclunk(f) == -EBADF)
+	if (_9pclunk(ctx, f) == -EBADF)
 		return -EBADF;
 
-	dirp->private_data.ptr = NULL;
 	return 0;
 }
 

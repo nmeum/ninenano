@@ -4,6 +4,9 @@ APPLICATION = 9pfs-shell
 # Board for which the application should be compiled
 BOARD ?= native
 
+# Disable optional assert(3) checks
+CFLAGS += -DNDEBUG
+
 # Change this to 0 show compiler invocation lines
 QUIET ?= 1
 
@@ -16,12 +19,12 @@ USEMODULE += shell
 USEMODULE += shell_commands
 
 # Modules required for using sock_tcp
-USEMODULE += ipv6_addr
-USEMODULE += lwip_ipv6_autoconfig
-USEMODULE += inet_csum
-USEMODULE += lwip_ethernet lwip_netdev
-USEMODULE += lwip_sock_tcp
-USEMODULE += netdev_default
-USEMODULE += ps
+USEMODULE += gnrc_netdev_default
+USEMODULE += auto_init_gnrc_netif
+USEMODULE += gnrc_ipv6_default
+USEMODULE += gnrc_tcp
+
+# Optional modules for debugging purposes
+USEMODULE += gnrc_icmpv6_echo
 
 include $(RIOTBASE)/Makefile.include

@@ -5,8 +5,6 @@
 #include <stddef.h>
 #include <sys/stat.h>
 
-#include "net/sock/tcp.h"
-
 /**
  * 9P version implemented by this library.
  *
@@ -23,15 +21,6 @@
  */
 #ifndef _9P_MSIZE
   #define _9P_MSIZE 1024
-#endif
-
-/**
- * Timeout used for reading from the connection socket. Defaults to not
- * using a timeout at all potentially waiting for ever if no data is
- * received.
- */
-#ifndef _9P_TIMOUT
-  #define _9P_TIMOUT SOCK_NO_TIMEOUT
 #endif
 
 /**
@@ -342,27 +331,88 @@ typedef struct {
 	uint16_t tag;
 } _9ppkt;
 
-int _9pinit(sock_tcp_ep_t*);
-void _9pclose(void);
+/**
+ * Function used for receiving data that should be parsed as a 9P
+ * R-messages and for sending T-messages to the server.
+ *
+ * @param buf Pointer where the data should be written to / read from.
+ * @param bufsiz Maximum space available at @p data.
+ * @return The number of bytes read on success.
+ * @return `0`, if no read data is available, but everything is in order.
+ * @return A negative errno value on error.
+ */
+typedef ssize_t (iofunc)(void *buf, size_t bufsiz);
 
-int _9pversion(void);
-int _9pattach(_9pfid**, char*, char*);
-int _9pclunk(_9pfid*);
-int _9pstat(_9pfid*, struct stat*);
-int _9pwalk(_9pfid**, char*);
-int _9popen(_9pfid*, int);
-int _9pcreate(_9pfid*, char*, int, int);
-int _9pread(_9pfid*, char*, size_t);
-int _9pwrite(_9pfid*, char*, size_t);
-int _9premove(_9pfid*);
+/**
+ * Connection context for a 9P connection.
+ */
+typedef struct {
+	/**
+	 * Global static buffer used for storing message specific parameters.
+	 * Message indepented parameters are stored on the stack using `_9ppkt`.
+	 */
+	uint8_t buffer[_9P_MSIZE];
+
+	/**
+	 * Function used to receive R-messages.
+	 */
+	iofunc *read;
+
+	/**
+	 * Function used to send T-messages.
+	 */
+	iofunc *write;
+
+	/**
+	 * From version(5):
+	 *   The client suggests a maximum message size, msize, that is the
+	 *   maximum length, in bytes, it will ever generate or expect to
+	 *   receive in a single 9P message.
+	 *
+	 * The msize we are suggestion to the server is defined by the macro
+	 * ::_9P_MSIZE for the unlikly event that the server choosen an msize
+	 * smaller than the one we are suggesting we are storing the msize
+	 * actually used for the communication in this variable.
+	 *
+	 * It is declared with the initial value ::_9P_MSIZE to make it possible
+	 * to use this variable as an argument to ::sock_tcp_read even before a
+	 * session is established.
+	 */
+	uint32_t msize;
+
+	/**
+	 * As with file descriptors, we need to store currently open fids
+	 * somehow. This is done in this static buffer. This buffer should only
+	 * be accessed using the ::fidtbl function it should never be modified
+	 * directly.
+	 *
+	 * This buffer is not static because it is used in the ::fidtbl
+	 * function from `util.c`.
+	 */
+	_9pfid fids[_9P_MAXFIDS];
+} _9pctx;
+
+void _9pinit(_9pctx*, iofunc*, iofunc*);
+
+int _9pversion(_9pctx*);
+int _9pattach(_9pctx*, _9pfid**, char*, char*);
+int _9pclunk(_9pctx*, _9pfid*);
+int _9pstat(_9pctx*, _9pfid*, struct stat*);
+int _9pwalk(_9pctx*, _9pfid**, char*);
+int _9popen(_9pctx*, _9pfid*, int);
+int _9pcreate(_9pctx*, _9pfid*, char*, int, int);
+int _9pread(_9pctx*, _9pfid*, char*, size_t);
+int _9pwrite(_9pctx*, _9pfid*, char*, size_t);
+int _9premove(_9pctx*, _9pfid*);
 
 void advbuf(_9ppkt*, size_t);
 void bufcpy(_9ppkt*, void*, size_t);
 
-_9pfid* fidtbl(uint32_t, _9pfidop);
-_9pfid* newfid(void);
+_9pfid* fidtbl(_9pfid*, uint32_t, _9pfidop);
+_9pfid* newfid(_9pfid*);
 
 int pstring(char*, _9ppkt*);
+int pnstring(char*, size_t, _9ppkt*);
 int hstring(char*, uint16_t, _9ppkt*);
 int hqid(_9pqid*, _9ppkt*);
 

@@ -46,8 +46,8 @@ Roadmap
 =======
 
 * [ ] Implement vfs_rename
-* [ ] Allow more than one connection
-* [ ] Abstraction to allow different transport layers
+* [x] Allow more than one connection
+* [x] Abstraction to allow different transport layers
 * [ ] Better error handling (parse Rerror messages)
 * [ ] Simplify `_fibtbl` function
 * [x] Better error codes for _9pattach and _9pwalk
