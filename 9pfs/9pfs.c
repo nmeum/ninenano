@@ -7,7 +7,7 @@
 #include "vfs.h"
 #include "9pfs.h"
 
-#define ENABLE_DEBUG (1)
+#define ENABLE_DEBUG (0)
 #include "debug.h"
 
 /**
