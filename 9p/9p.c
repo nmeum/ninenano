@@ -545,7 +545,7 @@ _9pstat(_9pctx *ctx, _9pfid *fid, struct stat *b)
 	htop32(fid->fid, &pkt);
 
 	if ((r = do9p(ctx, &pkt)))
-		return -1;
+		return r;
 
 	/* From intro(5):
 	 *   size[4] Rstat tag[2] stat[n]
