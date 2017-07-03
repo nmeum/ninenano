@@ -149,6 +149,7 @@ _9pfs_stat(vfs_mount_t *mountp, const char *restrict name, struct stat *restrict
 	int r;
 
 	fs = mountp->private_data;
+	r = 0;
 
 	mutex_lock(&fs->mtx);
 	if (_9pwalk(&fs->ctx, &f, (char*)name)) {
