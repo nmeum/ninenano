@@ -400,7 +400,7 @@ _9pfs_readdir(vfs_DIR *dirp, vfs_dirent_t *entry)
 	_9pfid *f;
 	_9ppkt pkt;
 	_9pfs *fs;
-	char dest[_9P_STATSIZ + VFS_NAME_MAX + 1];
+	char dest[_9P_MINSTSIZ + VFS_NAME_MAX + 1];
 	int r;
 
 	r = 0;

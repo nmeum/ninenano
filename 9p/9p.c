@@ -552,7 +552,7 @@ _9pstat(_9pctx *ctx, _9pfid *fid, struct stat *b)
 	 *
 	 * See stat(5) for the definition of stat[n].
 	 */
-	if (pkt.len < _9P_STATSIZ)
+	if (pkt.len < _9P_MINSTSIZ)
 		return -EBADMSG;
 
 	/* Skip: n[2], size[2], type[2] and dev[4]. */

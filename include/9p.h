@@ -102,7 +102,8 @@ enum {
 	 * stat. This includes the leading 16-bit count. See stat(5) for
 	 * more information.
 	 */
-	_9P_STATSIZ = 3 * BIT16SZ + BIT32SZ + _9P_QIDSIZ + 3 * BIT32SZ + BIT64SZ + 4 * BIT16SZ,
+	_9P_MINSTSIZ = 3 * BIT16SZ + BIT32SZ + _9P_QIDSIZ
+		+ 3 * BIT32SZ + BIT64SZ + 4 * BIT16SZ,
 
 	/**
 	 * Maximum length of a version string in a R-message. The
