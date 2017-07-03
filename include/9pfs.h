@@ -20,6 +20,16 @@ typedef struct {
 	 * Mutex used to synchronize access to the connection context.
 	 */
 	mutex_t mtx;
+
+	/**
+	 * User identification.
+	 */
+	char *uname;
+
+	/**
+	 * File tree to access (can be NULL).
+	 */
+	char *aname;
 } _9pfs;
 
 #endif

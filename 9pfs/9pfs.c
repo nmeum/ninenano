@@ -52,7 +52,7 @@ _9pfs_mount(vfs_mount_t *mountp)
 	mutex_init(&fs->mtx);
 	if ((r = _9pversion(&fs->ctx)))
 		return r;
-	if ((r = _9pattach(&fs->ctx, &f, "foobar", NULL)))
+	if ((r = _9pattach(&fs->ctx, &f, fs->uname, fs->aname)))
 		return r;
 
 	(void)f;

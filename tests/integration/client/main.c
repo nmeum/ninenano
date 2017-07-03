@@ -237,6 +237,9 @@ main(void)
 		return EXIT_FAILURE;
 	}
 
+	fs.uname = "glenda";
+	fs.aname = NULL;
+
 	_9pinit(&fs.ctx, recvfn, sendfn);
 
 	TESTS_START();
