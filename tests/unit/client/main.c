@@ -626,6 +626,7 @@ test_9p__rwrite_success(void)
 	setcmd("rwrite_success\n");
 
 	f.fid = 9002;
+	f.off = 0;
 	f.iounit = 50;
 
 	l = strlen(str);
