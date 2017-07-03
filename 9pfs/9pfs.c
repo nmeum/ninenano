@@ -463,15 +463,18 @@ _9pfs_closedir(vfs_DIR *dirp)
 static const vfs_file_system_ops_t _9pfs_fs_ops = {
 	.mount = _9pfs_mount,
 	.umount = _9pfs_umount,
+	.rename = NULL, /* TODO */
 	.unlink = _9pfs_unlink,
 	.mkdir = _9pfs_mkdir,
 	.rmdir = _9pfs_rmdir,
 	.stat = _9pfs_stat,
 	.statvfs = NULL,
+	.fstatvfs = NULL, /* TODO */
 };
 
 static const vfs_file_ops_t _9pfs_file_ops = {
 	.close = _9pfs_close,
+	.fcntl = NULL,
 	.fstat = _9pfs_fstat,
 	.lseek = _9pfs_lseek,
 	.open = _9pfs_open,
