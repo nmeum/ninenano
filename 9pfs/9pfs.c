@@ -248,7 +248,10 @@ static off_t _9pfs_lseek(vfs_file_t *filp, off_t off, int whence)
 	if (off < 0)
 		return -EINVAL;
 
+	mutex_lock(&fs->mtx);
 	f->off = off;
+	mutex_unlock(&fs->mtx);
+
 	return off;
 }
 
