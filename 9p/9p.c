@@ -509,7 +509,7 @@ _9pattach(_9pctx *ctx, _9pfid **dest, char *uname, char *aname)
  * @param f Pointer to a fid which should be closed.
  * @return `0` on success, on error a negative errno is returned.
  */
-inline int
+int
 _9pclunk(_9pctx *ctx, _9pfid *f)
 {
 	return fidrem(ctx, f, Tclunk);
@@ -796,7 +796,7 @@ _9pcreate(_9pctx *ctx, _9pfid *f, char *name, int perm, int flags)
  * @return The number of bytes read on success or a negative errno on
  * 	error.
  */
-inline ssize_t
+ssize_t
 _9pread(_9pctx *ctx, _9pfid *f, char *dest, size_t count)
 {
 	return ioloop(ctx, f, dest, count, Tread);
@@ -831,7 +831,7 @@ _9pwrite(_9pctx *ctx, _9pfid *f, char *src, size_t count)
  * @param f Pointer to the fid which should be removed.
  * @return `0` on success, on error a negative errno is returned.
  */
-inline int
+int
 _9premove(_9pctx *ctx, _9pfid *f)
 {
 	return fidrem(ctx, f, Tremove);
