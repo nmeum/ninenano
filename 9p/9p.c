@@ -11,11 +11,11 @@
 #include "random.h"
 #include "9p.h"
 
-#define ENABLE_DEBUG (1)
+#define ENABLE_DEBUG (0)
 #include "debug.h"
 
 /**
- * @defgroup Static utility functions.
+ * @defgroup _9putil Static utility functions.
  *
  * @{
  */
@@ -50,7 +50,6 @@ newpkt(_9pctx *ctx, _9ppkt *pkt, _9ptype type)
  *
  * @param ctx 9P connection context.
  * @param pkt Pointer to memory area to store result in.
- * @param buf Buffer containg the message which should be parsed.
  * @param buflen Total length of the given buffer.
  * @return `0` on success.
  * @return `-EBADMSG` if the buffer content isn't a valid 9P message.
@@ -377,8 +376,8 @@ _9pinit(_9pctx *ctx, iofunc *read, iofunc *write)
  *
  * The version parameter is always set to the value of `_9P_VERSION`,
  * the msize parameter on the other hand is always set to the value of
- * `_9P_MSIZE`. The msize choosen by the server is stored in the global
- * ::msize variable.
+ * `_9P_MSIZE`. The msize choosen by the server is stored in the msize
+ * member of the given connection context.
  *
  * @param ctx 9P connection context.
  *
@@ -510,7 +509,7 @@ _9pattach(_9pctx *ctx, _9pfid **dest, char *uname, char *aname)
  * @param f Pointer to a fid which should be closed.
  * @return `0` on success, on error a negative errno is returned.
  */
-inline int
+int
 _9pclunk(_9pctx *ctx, _9pfid *f)
 {
 	return fidrem(ctx, f, Tclunk);
@@ -532,7 +531,7 @@ _9pclunk(_9pctx *ctx, _9pfid *f)
  * @return `0` on success, on error a negative errno is returned.
  */
 int
-_9pstat(_9pctx *ctx, _9pfid *fid, struct stat *b)
+_9pstat(_9pctx *ctx, _9pfid *fid, struct stat *buf)
 {
 	int r;
 	uint32_t mode;
@@ -545,14 +544,14 @@ _9pstat(_9pctx *ctx, _9pfid *fid, struct stat *b)
 	htop32(fid->fid, &pkt);
 
 	if ((r = do9p(ctx, &pkt)))
-		return -1;
+		return r;
 
 	/* From intro(5):
 	 *   size[4] Rstat tag[2] stat[n]
 	 *
 	 * See stat(5) for the definition of stat[n].
 	 */
-	if (pkt.len < _9P_STATSIZ)
+	if (pkt.len < _9P_MINSTSIZ)
 		return -EBADMSG;
 
 	/* Skip: n[2], size[2], type[2] and dev[4]. */
@@ -564,18 +563,18 @@ _9pstat(_9pctx *ctx, _9pfid *fid, struct stat *b)
 
 	/* store the other information in the stat struct. */
 	ptoh32(&mode, &pkt);
-	b->st_mode = (mode & DMDIR) ? S_IFDIR : S_IFREG;
-	ptoh32((uint32_t*)&b->st_atime, &pkt);
-	ptoh32((uint32_t*)&b->st_mtime, &pkt);
-	b->st_ctime = b->st_mtime;
-	ptoh64((uint64_t*)&b->st_size, &pkt);
+	buf->st_mode = (mode & DMDIR) ? S_IFDIR : S_IFREG;
+	ptoh32((uint32_t*)&buf->st_atime, &pkt);
+	ptoh32((uint32_t*)&buf->st_mtime, &pkt);
+	buf->st_ctime = buf->st_mtime;
+	ptoh64((uint64_t*)&buf->st_size, &pkt);
 
 	/* information for stat struct we cannot extract from the reply. */
-	b->st_dev = b->st_ino = b->st_rdev = 0;
-	b->st_nlink = 1;
-	b->st_uid = b->st_gid = 0;
-	b->st_blksize = ctx->msize - _9P_IOHDRSIZ;
-	b->st_blocks = b->st_size / b->st_blksize + 1;
+	buf->st_dev = buf->st_ino = buf->st_rdev = 0;
+	buf->st_nlink = 1;
+	buf->st_uid = buf->st_gid = 0;
+	buf->st_blksize = ctx->msize - _9P_IOHDRSIZ;
+	buf->st_blocks = buf->st_size / buf->st_blksize + 1;
 
 	/* name, uid, gid and muid are ignored. */
 
@@ -797,7 +796,7 @@ _9pcreate(_9pctx *ctx, _9pfid *f, char *name, int perm, int flags)
  * @return The number of bytes read on success or a negative errno on
  * 	error.
  */
-inline ssize_t
+ssize_t
 _9pread(_9pctx *ctx, _9pfid *f, char *dest, size_t count)
 {
 	return ioloop(ctx, f, dest, count, Tread);
@@ -832,7 +831,7 @@ _9pwrite(_9pctx *ctx, _9pfid *f, char *src, size_t count)
  * @param f Pointer to the fid which should be removed.
  * @return `0` on success, on error a negative errno is returned.
  */
-inline int
+int
 _9premove(_9pctx *ctx, _9pfid *f)
 {
 	return fidrem(ctx, f, Tremove);

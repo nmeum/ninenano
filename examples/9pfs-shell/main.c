@@ -28,7 +28,7 @@ static gnrc_tcp_tcb_t tcb;
 /**
  * 9P connection context.
  */
-static _9pctx ctx;
+static _9pfs fs;
 
 /* import "ifconfig" shell command, used for printing addresses */
 extern int _netif_config(int argc, char **argv);
@@ -62,7 +62,7 @@ main(void)
 
 	mountp.mount_point = "/9pfs";
 	mountp.fs = &_9p_file_system;
-	mountp.private_data = &ctx;
+	mountp.private_data = &fs;
 
 	puts("Waiting for address autoconfiguration...");
 	xtimer_sleep(3);
@@ -77,7 +77,10 @@ main(void)
 		return EXIT_FAILURE;
 	}
 
-	_9pinit(&ctx, recvfn, sendfn);
+	fs.uname = "glenda";
+	fs.aname = NULL;
+
+	_9pinit(&fs.ctx, recvfn, sendfn);
 
 	if ((ret = vfs_mount(&mountp))) {
 		fprintf(stderr, "vfs_mount failed, err code: %d\n", ret);

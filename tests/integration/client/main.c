@@ -22,9 +22,9 @@
 #include "../../util.h"
 
 /**
- * 9P connection context.
+ * 9P file system superblock.
  */
-static _9pctx ctx;
+static _9pfs fs;
 
 /**
  * Mount point where the 9pfs is mounted.
@@ -38,7 +38,7 @@ set_up(void)
 
 	mountp.mount_point = "/mnt";
 	mountp.fs = &_9p_file_system;
-	mountp.private_data = &ctx;
+	mountp.private_data = &fs;
 
 	if ((ret = vfs_mount(&mountp)))
 		fprintf(stderr, "vfs_mount failed: %d\n", ret);
@@ -237,7 +237,10 @@ main(void)
 		return EXIT_FAILURE;
 	}
 
-	_9pinit(&ctx, recvfn, sendfn);
+	fs.uname = "glenda";
+	fs.aname = NULL;
+
+	_9pinit(&fs.ctx, recvfn, sendfn);
 
 	TESTS_START();
 	TESTS_RUN(tests_9pfs_tests());

@@ -26,7 +26,7 @@
 #endif
 
 /**
- * @defgroup Functions for packet buffers.
+ * @defgroup pktBuf Functions for packet buffers.
  *
  * @{
  */
@@ -66,7 +66,7 @@ bufcpy(_9ppkt *pkt, void *src, size_t n)
 /**@}*/
 
 /**
- * @defgroup Functions for the fid table.
+ * @defgroup fidTbl Functions for the fid table.
  *
  * @{
  */
@@ -154,8 +154,8 @@ newfid(_9pfid *fids)
 /**@}*/
 
 /**
- * @defgroup Functions for converting from host byte order to the byte \
- *   order used by the 9P protocol.
+ * @defgroup htop Functions for converting from host byte order to the \
+ *   byte order used by the 9P protocol.
  *
  * Functions for converting integers encoded using the byte order used
  * by the current CPU (the host system) to the one used by the protocol
@@ -200,8 +200,8 @@ htop64(uint64_t val, _9ppkt *pkt)
 /**@}*/
 
 /**
- * @defgroup Functions for converting from the byte order used by the \
- *   9P protocol to the byte order used by the host.
+ * @defgroup ptoh Functions for converting from the byte order used by \
+ *   the 9P protocol to the byte order used by the host.
  *
  * Functions for converting integers encoded using the byte order used
  * by the 9P protocol to the one used by the CPU (the host system).
@@ -249,8 +249,9 @@ ptoh64(uint64_t *dest, _9ppkt *pkt)
 /**@}*/
 
 /**
- * @defgroup Functions for converting strings from host representation \
- *   to protocol representation and vice versa.
+ * @defgroup strings Functions for converting strings from host \
+ *   representation to protocol representation and vice versa.
+ *
  * @{
  */
 
@@ -351,7 +352,7 @@ hstring(char *dest, uint16_t n, _9ppkt *pkt)
 /**@}*/
 
 /**
- * @defgroup Functions for converting qids.
+ * @defgroup qids Functions for converting qids.
  *
  * @{
  */
@@ -363,9 +364,10 @@ hstring(char *dest, uint16_t n, _9ppkt *pkt)
  *   unsigned integers: first the four-byte qid version, then the eight-
  *   byte qid path.
  *
- * This function converts such a qid representation to a _9pqid struct.
+ * This function converts such a qid representation to a ::_9pqid
+ * struct.
  *
- * @param Pointer to a allocated _9pqid struct.
+ * @param dest Pointer to an allocated ::_9pqid struct.
  * @param pkt 9P packet to read qid from.
  * @return `0` on success.
  * @return `-1` on failure.

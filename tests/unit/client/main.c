@@ -49,7 +49,7 @@ set_up(void)
 }
 
 /**
- * @defgroup Tests for utility functios from `9p/util.c`.
+ * @defgroup _9putil_tests Tests for utility functios from `9p/util.c`.
  *
  * @{
  */
@@ -283,7 +283,7 @@ tests_9putil_tests(void)
 /**@}*/
 
 /**
- * @defgroup Tests for protocol functions from `9p/9p.c`.
+ * @defgroup _9p_tests Tests for protocol functions from `9p/9p.c`.
  *
  * You might be wondering why there are no comments below this points.
  * This is the case because the purpose of the various test cases is
@@ -409,6 +409,8 @@ test_9p__rstat_success(void)
 {
 	_9pfid f;
 	struct stat st;
+
+	f.fid = 2342;
 
 	setcmd("rstat_success\n");
 	TEST_ASSERT_EQUAL_INT(0, _9pstat(&ctx, &f, &st));
@@ -626,6 +628,7 @@ test_9p__rwrite_success(void)
 	setcmd("rwrite_success\n");
 
 	f.fid = 9002;
+	f.off = 0;
 	f.iounit = 50;
 
 	l = strlen(str);
