@@ -35,7 +35,7 @@ breakpath(char *buf, size_t bufsiz, const char *path, char **dname)
 }
 
 /**
- * @defgroup File system operations.
+ * @defgroup _9pfs_fs_ops File system operations.
  *
  * @{
  */
@@ -173,7 +173,7 @@ ret:
 /**@}*/
 
 /**
- * @defgroup File operations.
+ * @defgroup _9pfs_file_ops File operations.
  *
  * @{
  */
@@ -354,7 +354,7 @@ _9pfs_write(vfs_file_t *filp, const void *src, size_t nbytes)
 /**@}*/
 
 /**
- * @defgroup Directory operations.
+ * @defgroup _9pfs_dir_ops Directory operations.
  *
  * @{
  */
@@ -458,7 +458,7 @@ _9pfs_closedir(vfs_DIR *dirp)
 /**@}*/
 
 /**
- * @defgroup Struct definitions.
+ * @defgroup fs Struct definitions.
  *
  * @{
  */

@@ -49,7 +49,7 @@ set_up(void)
 }
 
 /**
- * @defgroup Tests for utility functios from `9p/util.c`.
+ * @defgroup _9putil_tests Tests for utility functios from `9p/util.c`.
  *
  * @{
  */
@@ -283,7 +283,7 @@ tests_9putil_tests(void)
 /**@}*/
 
 /**
- * @defgroup Tests for protocol functions from `9p/9p.c`.
+ * @defgroup _9p_tests Tests for protocol functions from `9p/9p.c`.
  *
  * You might be wondering why there are no comments below this points.
  * This is the case because the purpose of the various test cases is

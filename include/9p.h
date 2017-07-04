@@ -349,8 +349,9 @@ typedef ssize_t (iofunc)(void *buf, size_t bufsiz);
  */
 typedef struct {
 	/**
-	 * Global static buffer used for storing message specific parameters.
-	 * Message indepented parameters are stored on the stack using `_9ppkt`.
+	 * Global static buffer used for storing message specific
+	 * parameters.  Message indepented parameters are stored on the
+	 * stack using `_9ppkt`.
 	 */
 	uint8_t buffer[_9P_MSIZE];
 
@@ -366,26 +367,27 @@ typedef struct {
 
 	/**
 	 * From version(5):
-	 *   The client suggests a maximum message size, msize, that is the
-	 *   maximum length, in bytes, it will ever generate or expect to
-	 *   receive in a single 9P message.
+	 *   The client suggests a maximum message size, msize, that is
+	 *   the maximum length, in bytes, it will ever generate or
+	 *   expect to receive in a single 9P message.
 	 *
-	 * The msize we are suggestion to the server is defined by the macro
-	 * ::_9P_MSIZE for the unlikly event that the server choosen an msize
-	 * smaller than the one we are suggesting we are storing the msize
-	 * actually used for the communication in this variable.
+	 * The msize we are suggestion to the server is defined by the
+	 * macro ::_9P_MSIZE for the unlikly event that the server
+	 * choosen an msize smaller than the one we are suggesting we
+	 * are storing the msize actually used for the communication in
+	 * this variable.
 	 *
-	 * It is declared with the initial value ::_9P_MSIZE to make it possible
-	 * to use this variable as an argument to ::sock_tcp_read even before a
-	 * session is established.
+	 * It is declared with the initial value ::_9P_MSIZE to make it
+	 * possible to use this variable as an argument to the read
+	 * function even before a session is established.
 	 */
 	uint32_t msize;
 
 	/**
-	 * As with file descriptors, we need to store currently open fids
-	 * somehow. This is done in this static buffer. This buffer should only
-	 * be accessed using the ::fidtbl function it should never be modified
-	 * directly.
+	 * As with file descriptors, we need to store currently open
+	 * fids somehow. This is done in this static buffer. This buffer
+	 * should only be accessed using the ::fidtbl function it should
+	 * never be modified directly.
 	 *
 	 * This buffer is not static because it is used in the ::fidtbl
 	 * function from `util.c`.
