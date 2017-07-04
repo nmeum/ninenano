@@ -30,7 +30,7 @@
  * 	initialized.
  * @param type Type which should be used for this packet.
  */
-void
+static void
 newpkt(_9pctx *ctx, _9ppkt *pkt, _9ptype type)
 {
 	pkt->buf = ctx->buffer + _9P_HEADSIZ;
