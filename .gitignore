@@ -9,4 +9,5 @@ tests/integration/server/server
 tests/unit.log
 tests/integration.log
 
+docs/
 examples/9pfs-shell/bin
