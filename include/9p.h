@@ -404,8 +404,8 @@ int _9pstat(_9pctx*, _9pfid*, struct stat*);
 int _9pwalk(_9pctx*, _9pfid**, char*);
 int _9popen(_9pctx*, _9pfid*, int);
 int _9pcreate(_9pctx*, _9pfid*, char*, int, int);
-int _9pread(_9pctx*, _9pfid*, char*, size_t);
-int _9pwrite(_9pctx*, _9pfid*, char*, size_t);
+ssize_t _9pread(_9pctx*, _9pfid*, char*, size_t);
+ssize_t _9pwrite(_9pctx*, _9pfid*, char*, size_t);
 int _9premove(_9pctx*, _9pfid*);
 
 void advbuf(_9ppkt*, size_t);
