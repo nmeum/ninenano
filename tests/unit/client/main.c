@@ -410,6 +410,8 @@ test_9p__rstat_success(void)
 	_9pfid f;
 	struct stat st;
 
+	f.fid = 2342;
+
 	setcmd("rstat_success\n");
 	TEST_ASSERT_EQUAL_INT(0, _9pstat(&ctx, &f, &st));
 
