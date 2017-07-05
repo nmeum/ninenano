@@ -1,35 +1,106 @@
+**GEFAHR ACHTUNG GEFAHR:** THIS CODE IS WRITTEN IN A MEMORY UNSAFE
+PROGRAMMING LANGUAGE AND ACCEPTS ARBITRARY INPUT FROM A NETWORK
+CONNECTION. I AM PRETTY SURE THAT I AM NOT CAPABLE OF WRITING BUG-FREE C
+CODE SO PLEASE DON'T BLAME ME IF YOUR CONSTRAINED DEVICES BECOMES PART
+OF THE NEXT INTERNET OF THINGS BOTNET. KTHXBYE!
+
 9RIOT
 =====
 
-Implementation of the 9P protocol for the RIOT operating system.
-
-Usage
-=====
+Constrained client implementation of the 9P network protocol. This
+implementation is currently only targeting the [RIOT][3] operating
+system but should run on other platforms with minimal modifications. The
+code might be adjusted to be more portable by default in the future.
 
 9RIOT currently consists of two components:
 
-1. 9p: An implementation of the 9P network protocol
+1. 9p: A client implementation of the 9P network protocol
 2. 9pfs: Virtual 9P file system using RIOTs VFS layer
 
-When writing IoT application that utilize 9P as an application layer
+When writing IoT applications that utilize 9P as an application layer
 protocol it is probably sufficient to use the 9P component directly
-without the VFS layer.
+without the VFS layer. Doing so will spare you some bytes in the text
+segment.
+
+Status
+------
+
+This implementation of the 9P protocol has the following limitations:
+
+1. It only sends one T-message at a time and waits for an R-message from
+   the server before sending additional T-messages.
+2. `flush(5)` is not implemented because due to the first limitation it
+   wasn't needed.
+3. Only files with a maximum amount of sixteen path elements can be
+   accessed using `_9pwalk`.
+4. Proper handling of `Rerror` messages is not implemented.
+5. `Twstat` is currently not implemented.
+
+*The fourth and fifth limitation might be resolved in feature releases.*
+
+Compilation
+-----------
+
+The library isn't currently integrated into RIOT as a pkg. To use this
+library in your RIOT application you therefore need to manually create
+such a package or copy the required C files to your application
+directory. The latter method is also used for the unit tests in this
+repository.
+
+When compiling the library their are a few CPP macros which can be
+defined to configure the library they are listed below:
+
+1. `_9P_MSIZE`: Maximum message size and therefore also equal to the
+   buffer size used to store 9P messages.
+2. `_9P_MAXFIDS`: Maximum amount of open fids for a 9P connection.
+
+If you want to reduce the size of the library set those macros to a
+smaller value. In addition to that you can define `NDEBUG` to prevent
+some optional sanity checks form being included in the resulting binary.
+
+Usage
+-----
+
+**Disclaimer:** This library requires a basic understanding of the 9P
+network protocol. If you don't know how 9P works start by reading the
+`intro(5)` [man page][6] shipped with the fourth edition of Plan 9
+operating system.
+
+The API is very straight forward and shouldn't change a lot anymore. If
+you want to use 9P in combination with the provided VFS layer start by
+reading the [VFS documentation][5]. In order to use 9pfs you need to
+point the `private_data` member of your `vfs_mount_t` to an allocated
+`_9pfs` superblock in addition to that the `ctx` member of the
+superblock needs to be initialized using `_9pinit`.
+
+If you want to use the 9P component directly all you have to do is
+allocate memory for a `_9pctx` and afterwards initialize it with
+`_9pinit`. Consult the documentation or the examples in `examples/` and
+`tests/` if you need additional help.
 
 Documentation
-=============
+-------------
 
-TODO
+The source code is documented in a format that can be parsed by
+[Doxygen][4]. A `Doxyfile` is also provided. To generate source code
+documentation using the supplied `Doxyfile` run the following command:
+
+	$ doxygen Doxyfile
+
+Afterwards the documentation will be located in a newly created folder
+called `docs`, view the docs by opening `docs/index.html` in your
+favorite web browser.
 
 Tests
-=====
+-----
 
 9RIOT comes with both unit and integration tests. The unit tests use the
 9P component directly while the integration tests use 9P through the
 9pfs component.
 
 In order to run the tests you need to setup the toolchain for RIOTs
-[native family](1). Besides you need to install go >= 1.5, python 3.X
-and the [pexpect](2) python package.
+[native family][1]. Besides you need to install go `>= 1.5`, python
+`3.X` and the [pexpect][2] python package.
 
 Besides a tun devices needs to created:
 
@@ -42,24 +113,13 @@ After creating the tun devices you can run the tests:
 	$ export TESTADDR="fe80::e42a:1aff:feca:10ec"
 	$ make test
 
-Roadmap
-=======
-
-* [ ] Implement vfs_rename
-* [x] Allow more than one connection
-* [x] Abstraction to allow different transport layers
-* [ ] Better error handling (parse Rerror messages)
-* [ ] Simplify `_fibtbl` function
-* [x] Better error codes for _9pattach and _9pwalk
-* [x] Buffer overflow checks for insertion commands
-* [ ] More DEBUG calls
-* [x] Only do certain checks when compiled with -DDDEVHELP + assert(3)
-* [x] Better errno return values to differentiate paths in unit tests
-* [x] 9pfs VFS layer
-* [ ] Refactor Documentation
+**Note:** RIOT will add an additional IP address to the interface when
+you run the tests for the first time. However, it doesn't matter which
+one you use as a value for the `TESTADDR` environment variable, meaning
+you can ignore the additional IP address.
 
 License
-=======
+-------
 
 This program is free software: you can redistribute it and/or
 modify it under the terms of the GNU Affero General Public
@@ -77,3 +137,7 @@ License along with this program. If not, see
 
 [1]: https://github.com/RIOT-OS/RIOT/wiki/Family:-native#toolchains
 [2]: https://pypi.python.org/pypi/pexpect
+[3]: http://riot-os.org/
+[4]: http://www.stack.nl/~dimitri/doxygen/
+[5]: http://riot-os.org/api/group__sys__vfs.html
+[6]: http://man.cat-v.org/plan_9/5/intro
