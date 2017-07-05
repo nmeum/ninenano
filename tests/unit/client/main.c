@@ -340,7 +340,7 @@ static void
 test_9p__header_wrong_type(void)
 {
 	setcmd("header_wrong_type\n");
-	TEST_ASSERT_EQUAL_INT(-ENOTSUP, _9pversion(&ctx));
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pversion(&ctx));
 }
 
 static void

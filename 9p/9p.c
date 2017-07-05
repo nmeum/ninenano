@@ -48,9 +48,6 @@ newpkt(_9pctx *ctx, _9ppkt *pkt, _9ptype type)
  *   packet buffer is also used to store the result.
  * @return `0` on success.
  * @return `-EBADMSG` if the buffer content isn't a valid 9P message.
- * @return `-ENOTSUP` if the message type isn't supported.
- *   This is a client implementation thus we only support R-messages,
- *   T-messages are not supported and yield this error code.
  */
 static int
 _9pheader(_9ppkt *pkt)
@@ -81,8 +78,6 @@ _9pheader(_9ppkt *pkt)
 	DEBUG("Type of 9P message: %"PRIu8"\n", type);
 	if (type < Tversion || type >= Tmax)
 		return -EBADMSG;
-	if (type % 2 == 0)
-		return -ENOTSUP; /* Client implementation */
 	pkt->type = (_9ptype)type;
 
 	/* From intro(5):
