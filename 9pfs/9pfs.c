@@ -62,10 +62,7 @@ _9pfs_mount(vfs_mount_t *mountp)
 static int
 _9pfs_umount(vfs_mount_t *mountp)
 {
-	_9pfs *fs;
-
-	fs = mountp->private_data;
-	memset(fs->ctx.fids, 0, _9P_MAXFIDS * sizeof(_9pfid));
+	(void)mountp;
 
 	return 0;
 }
