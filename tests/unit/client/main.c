@@ -298,7 +298,6 @@ tests_9putil_tests(void)
 		new_TestFixture(test_9putil__newfid_full),
 	};
 
-	/* Use _9pclose as tear down function to reset the fid table. */
 	EMB_UNIT_TESTCALLER(_9putil_tests, NULL, tear_down, fixtures);
 	return (Test*)&_9putil_tests;
 }
