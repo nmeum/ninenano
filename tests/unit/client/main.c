@@ -200,6 +200,7 @@ test_9putil_fidtbl_add_full(void)
 
 	for (i = 1; i <= _9P_MAXFIDS; i++) {
 		f = fidtbl(ctx.fids, i, ADD);
+		TEST_ASSERT_NOT_NULL(f);
 		f->fid = i;
 	}
 
@@ -259,6 +260,21 @@ test_9putil__newfid(void)
 	TEST_ASSERT_EQUAL_INT(f1->fid, f2->fid);
 }
 
+static void
+test_9putil__newfid_full(void)
+{
+	_9pfid *f;
+	size_t i;
+
+	for (i = 1; i <= _9P_MAXFIDS; i++) {
+		f = fidtbl(ctx.fids, i, ADD);
+		TEST_ASSERT_NOT_NULL(f);
+		f->fid = i;
+	}
+
+	TEST_ASSERT_NULL(newfid(ctx.fids));
+}
+
 Test*
 tests_9putil_tests(void)
 {
@@ -279,6 +295,7 @@ tests_9putil_tests(void)
 		new_TestFixture(test_9putil_fidtbl_delete_rootfid),
 
 		new_TestFixture(test_9putil__newfid),
+		new_TestFixture(test_9putil__newfid_full),
 	};
 
 	/* Use _9pclose as tear down function to reset the fid table. */
