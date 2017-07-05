@@ -136,14 +136,14 @@ newfid(_9pfid *fids)
 	size_t i;
 	uint32_t fid;
 
-	for (i = 1; i < _9P_MAXFIDS; i++) {
+	for (i = 1; i <= _9P_MAXFIDS; i++) {
 		fid = random_uint32_range(1, UINT32_MAX);
 		if (fidtbl(fids, fid, GET))
 			continue;
 
 		/* TODO room for optimization don't call fidtbl twice. */
 		r = fidtbl(fids, fid, ADD);
-		assert(r != NULL);
+		if (!r) break;
 
 		r->fid = fid;
 		return r;
