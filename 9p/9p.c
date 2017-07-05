@@ -40,17 +40,12 @@ newpkt(_9pctx *ctx, _9ppkt *pkt, _9ptype type)
 
 /**
  * Parses the header (the first 7 bytes) of a 9P message contained in
- * the given buffer. The result is written to the memory area pointed to
- * by the `_9ppkt` buffer.
+ * the given packet buffer. The result is written to the len, type and
+ * tag members of the given packet buffer. Besides the position in the
+ * packet buffer is advanced.
  *
- * The buflen parameter is a `uint32_t` and not a `size_t` because each
- * 9P message begins with a four-byte size field specifying the size of
- * the entire 9P message. Thus the message length will never exceed `2^32`
- * bytes.
- *
- * @param ctx 9P connection context.
- * @param pkt Pointer to memory area to store result in.
- * @param buflen Total length of the given buffer.
+ * @param pkt Packet buffer from which data should be read. Besides this
+ *   packet buffer is also used to store the result.
  * @return `0` on success.
  * @return `-EBADMSG` if the buffer content isn't a valid 9P message.
  * @return `-ENOTSUP` if the message type isn't supported.
@@ -58,24 +53,22 @@ newpkt(_9pctx *ctx, _9ppkt *pkt, _9ptype type)
  *   T-messages are not supported and yield this error code.
  */
 static int
-_9pheader(_9pctx *ctx, _9ppkt *pkt, uint32_t buflen)
+_9pheader(_9ppkt *pkt)
 {
 	uint8_t type;
 	uint32_t len;
-
-	pkt->buf = ctx->buffer;
 
 	/* From intro(5):
 	 *   Each 9P message begins with a four-byte size field
 	 *   specifying the length in bytes of the complete message
 	 *   including the four bytes of the size field itself.
 	 */
-	if (buflen < BIT32SZ)
+	if (pkt->len < BIT32SZ)
 		return -EBADMSG;
 	ptoh32(&len, pkt);
 
 	DEBUG("Length of the 9P message: %"PRIu32"\n", len);
-	if (len > buflen || len < _9P_HEADSIZ)
+	if (len > pkt->len + BIT32SZ || len < _9P_HEADSIZ)
 		return -EBADMSG;
 	pkt->len = len - BIT32SZ;
 
@@ -89,7 +82,7 @@ _9pheader(_9pctx *ctx, _9ppkt *pkt, uint32_t buflen)
 	if (type < Tversion || type >= Tmax)
 		return -EBADMSG;
 	if (type % 2 == 0)
-		return -ENOTSUP; /* Client only implementation */
+		return -ENOTSUP; /* Client implementation */
 	pkt->type = (_9ptype)type;
 
 	/* From intro(5):
@@ -136,8 +129,11 @@ do9p(_9pctx *ctx, _9ppkt *p)
 	p->tag = (p->type == Tversion) ?
 		_9P_NOTAG : random_uint32();
 
-	p->buf = ctx->buffer; /* Reset buffer position. */
+	assert(ctx->msize > p->len);
 	reallen = ctx->msize - p->len;
+
+	p->buf = ctx->buffer; /* Reset buffer position. */
+	p->len = _9P_HEADSIZ;
 
 	/* Build the "header", meaning: size[4] type[1] tag[2]
 	 * Every 9P message needs those first 7 bytes. */
@@ -149,7 +145,7 @@ do9p(_9pctx *ctx, _9ppkt *p)
 	if ((ret = ctx->write(ctx->buffer, reallen)) < 0)
 		return ret;
 
-	/* Tag and type will be overwritten by _9pheader. */
+	/* Values will be overwritten by _9pheader. */
 	ttype = p->type;
 	ttag = p->tag;
 
@@ -161,8 +157,11 @@ do9p(_9pctx *ctx, _9ppkt *p)
 	if ((size_t)ret > UINT32_MAX)
 		return -EMSGSIZE;
 
+	p->len = ret;
+	p->buf = ctx->buffer;
+
 	DEBUG("Read %zu bytes from server, parsing them...\n", ret);
-	if ((ret = _9pheader(ctx, p, (uint32_t)ret)))
+	if ((ret = _9pheader(p)))
 		return ret;
 
 	if (p->tag != ttag) {
