@@ -696,7 +696,9 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 	return 0;
 
 err:
-	assert(fidtbl(ctx->fids, fid->fid, DEL) != NULL);
+	fid = fidtbl(ctx->fids, fid->fid, DEL);
+	assert(fid != NULL);
+
 	return r;
 }
 
