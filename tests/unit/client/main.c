@@ -31,7 +31,6 @@ static _9pctx ctx;
 static void
 setcmd(char *cmd)
 {
-	printf("RUNNING: %s", cmd);
 	if (sock_tcp_write(&csock, cmd, strlen(cmd)) < 0)
 		TEST_FAIL("Couldn't write to control server");
 }
