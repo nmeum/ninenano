@@ -178,15 +178,18 @@ test_9putil_fidtbl_add(void)
 	_9pfid *f;
 
 	f = fidtbl(ctx.fids, 23, ADD);
+	f->fid = 23;
 
 	TEST_ASSERT_NOT_NULL(f);
-	TEST_ASSERT_EQUAL_INT(0, f->fid);
+	TEST_ASSERT_EQUAL_INT(23, f->fid);
+	TEST_ASSERT_EQUAL_INT(1, cntfids(ctx.fids));
 }
 
 static void
 test_9putil_fidtbl_add_invalid(void)
 {
 	TEST_ASSERT_NULL(fidtbl(ctx.fids, 0, ADD));
+	TEST_ASSERT_EQUAL_INT(0, cntfids(ctx.fids));
 }
 
 static void
@@ -201,6 +204,7 @@ test_9putil_fidtbl_add_full(void)
 	}
 
 	TEST_ASSERT_NULL(fidtbl(ctx.fids, ++i, ADD));
+	TEST_ASSERT_EQUAL_INT(_9P_MAXFIDS, cntfids(ctx.fids));
 }
 
 static void
@@ -246,6 +250,8 @@ test_9putil__newfid(void)
 
 	f1 = newfid(ctx.fids);
 	TEST_ASSERT_NOT_NULL(f1);
+
+	TEST_ASSERT_EQUAL_INT(1, cntfids(ctx.fids));
 
 	f2 = fidtbl(ctx.fids, f1->fid, GET);
 	TEST_ASSERT_NOT_NULL(f2);
@@ -392,7 +398,9 @@ test_9p__rattach_success(void)
 
 	setcmd("rattach_success\n");
 	TEST_ASSERT_EQUAL_INT(0, _9pattach(&ctx, &fid, "foo", NULL));
+
 	TEST_ASSERT(fid->fid > 0);
+	TEST_ASSERT_EQUAL_INT(1, cntfids(ctx.fids));
 }
 
 static void
@@ -446,6 +454,8 @@ test_9p__rwalk_success(void)
 	TEST_ASSERT_EQUAL_INT(23, f->qid.type);
 	TEST_ASSERT_EQUAL_INT(42, f->qid.vers);
 	TEST_ASSERT_EQUAL_INT(1337, f->qid.path);
+
+	TEST_ASSERT_EQUAL_INT(1, cntfids(ctx.fids));
 }
 
 static void
@@ -457,6 +467,7 @@ test_9p__rwalk_rootfid(void)
 	TEST_ASSERT_EQUAL_INT(0, _9pwalk(&ctx, &f, "/"));
 
 	TEST_ASSERT(f->fid != _9P_ROOTFID);
+	TEST_ASSERT_EQUAL_INT(1, cntfids(ctx.fids));
 }
 
 static void
@@ -466,6 +477,7 @@ test_9p__rwalk_invalid_len(void)
 
 	setcmd("rwalk_invalid_len\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&ctx, &f, "foobar"));
+	TEST_ASSERT_EQUAL_INT(0, cntfids(ctx.fids));
 }
 
 static void
@@ -476,6 +488,7 @@ test_9p__rwalk_path_too_long(void)
 
 	path = "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17";
 	TEST_ASSERT_EQUAL_INT(-ENAMETOOLONG, _9pwalk(&ctx, &f, path));
+	TEST_ASSERT_EQUAL_INT(0, cntfids(ctx.fids));
 }
 
 static void
@@ -485,6 +498,7 @@ test_9p__rwalk_nwqid_too_large(void)
 
 	setcmd("rwalk_nwqid_too_large\n");
 	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pwalk(&ctx, &f, "foo"));
+	TEST_ASSERT_EQUAL_INT(0, cntfids(ctx.fids));
 }
 
 static void

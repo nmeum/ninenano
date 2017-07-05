@@ -62,6 +62,7 @@ test_9pfs__create_and_remove_directory(void)
 	TEST_ASSERT_EQUAL_INT(0, vfs_rmdir("/mnt/foo/wtf"));
 
 	TEST_ASSERT(vfs_stat("/mnt/foo/wtf", &st) != 0);
+	TEST_ASSERT_EQUAL_INT(1, cntfids(fs.ctx.fids));
 }
 
 static void
@@ -130,6 +131,8 @@ test_9pfs__write_lseek_and_read(void)
 	fd = vfs_open("/mnt/writeme", O_RDWR|O_TRUNC, S_IRUSR|S_IWUSR);
 	TEST_ASSERT(fd >= 0);
 
+	TEST_ASSERT_EQUAL_INT(2, cntfids(fs.ctx.fids));
+
 	n = vfs_write(fd, str, 6);
 	TEST_ASSERT_EQUAL_INT(6, n);
 
@@ -142,6 +145,7 @@ test_9pfs__write_lseek_and_read(void)
 	TEST_ASSERT_EQUAL_STRING(str, (char*)dest);
 
 	TEST_ASSERT_EQUAL_INT(0, vfs_close(fd));
+	TEST_ASSERT_EQUAL_INT(1, cntfids(fs.ctx.fids));
 }
 
 static void
@@ -150,7 +154,10 @@ test_9pfs__opendir_and_closedir(void)
 	vfs_DIR dirp;
 
 	TEST_ASSERT_EQUAL_INT(0, vfs_opendir(&dirp, "/mnt/foo"));
+	TEST_ASSERT_EQUAL_INT(2, cntfids(fs.ctx.fids));
 	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
+
+	TEST_ASSERT_EQUAL_INT(1, cntfids(fs.ctx.fids));
 }
 
 static void
@@ -160,6 +167,7 @@ test_9pfs__opendir_file(void)
 
 	TEST_ASSERT_EQUAL_INT(-ENOTDIR,
 		vfs_opendir(&dirp, "/mnt/foo/bar/hello"));
+	TEST_ASSERT_EQUAL_INT(1, cntfids(fs.ctx.fids));
 }
 
 static void
@@ -174,6 +182,7 @@ test_9pfs__readdir_single_entry(void)
 	TEST_ASSERT_EQUAL_INT(0, vfs_readdir(&dirp, &entry));
 
 	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
+	TEST_ASSERT_EQUAL_INT(1, cntfids(fs.ctx.fids));
 }
 
 static void
@@ -193,6 +202,7 @@ test_9pfs__readdir_multiple_entries(void)
 	TEST_ASSERT_EQUAL_INT(0, vfs_readdir(&dirp, &entry));
 
 	TEST_ASSERT_EQUAL_INT(0, vfs_closedir(&dirp));
+	TEST_ASSERT_EQUAL_INT(1, cntfids(fs.ctx.fids));
 }
 
 Test*

@@ -35,3 +35,20 @@ sendfn(void *buf, size_t count)
 {
 	return sock_tcp_write(&psock, buf, count);
 }
+
+/**
+ * Returns the amount of currently opened fids.
+ *
+ * @param fids Pointer to the fid table.
+ * @return Amount of open fids in the fid table.
+ */
+static size_t
+cntfids(_9pfid *fids)
+{
+	size_t i, n;
+
+	for (i = n = 0; i < _9P_MAXFIDS; i++)
+		if (fids[i].fid) n++;
+
+	return n;
+}
