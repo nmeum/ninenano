@@ -40,6 +40,7 @@ set_up(void)
 	mountp.fs = &_9p_file_system;
 	mountp.private_data = &fs;
 
+	_9pinit(&fs.ctx, recvfn, sendfn);
 	if ((ret = vfs_mount(&mountp)))
 		fprintf(stderr, "vfs_mount failed: %d\n", ret);
 }
@@ -249,8 +250,6 @@ main(void)
 
 	fs.uname = "glenda";
 	fs.aname = NULL;
-
-	_9pinit(&fs.ctx, recvfn, sendfn);
 
 	TESTS_START();
 	TESTS_RUN(tests_9pfs_tests());
