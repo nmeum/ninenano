@@ -1,8 +1,8 @@
 **GEFAHR ACHTUNG GEFAHR:** THIS CODE IS WRITTEN IN A MEMORY UNSAFE
 PROGRAMMING LANGUAGE AND ACCEPTS ARBITRARY INPUT FROM A NETWORK
 CONNECTION. I AM PRETTY SURE THAT I AM NOT CAPABLE OF WRITING BUG-FREE C
-CODE SO PLEASE DON'T BLAME ME IF YOUR CONSTRAINED DEVICES BECOMES PART
-OF THE NEXT INTERNET OF THINGS BOTNET. KTHXBYE!
+CODE SO PLEASE DON'T BLAME ME IF YOUR CONSTRAINED DEVICE BECOMES PART OF
+THE NEXT INTERNET OF THINGS BOTNET. KTHXBYE!
 
 9RIOT
 =====
@@ -121,19 +121,18 @@ you can ignore the additional IP address.
 License
 -------
 
-This program is free software: you can redistribute it and/or
-modify it under the terms of the GNU Affero General Public
-License as published by the Free Software Foundation, either
-version 3 of the License, or (at your option) any later version.
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-Affero General Public License for more details.
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License for more details.
 
-You should have received a copy of the GNU Affero General Public
-License along with this program. If not, see
-<http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <http://www.gnu.org/licenses/>.
 
 [1]: https://github.com/RIOT-OS/RIOT/wiki/Family:-native#toolchains
 [2]: https://pypi.python.org/pypi/pexpect
