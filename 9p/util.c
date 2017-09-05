@@ -19,11 +19,11 @@
  * doesn't swap the byte order on little endian plattforms.
  */
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#   define _9p_swap(V, T) (V)
+  #define _9p_swap(V, T) (V)
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#   define _9p_swap(V, T) (byteorder_swap##T((V)))
+  #define _9p_swap(V, T) (byteorder_swap##T((V)))
 #else
-#   error "Byte order is neither little nor big!"
+  #error "Byte order is neither little nor big!"
 #endif
 
 /**
