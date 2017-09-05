@@ -5,7 +5,7 @@
 #include <sys/types.h>
 
 #include "9p.h"
-#include "random.h"
+#include "compat.h"
 #include "byteorder.h"
 
 /**
@@ -137,7 +137,7 @@ newfid(_9pfid *fids)
 	uint32_t fid;
 
 	for (i = 1; i <= _9P_MAXFIDS; i++) {
-		fid = random_uint32_range(1, UINT32_MAX);
+		fid = randu32() - 1; /* fid must not have value 0. */
 		if (fidtbl(fids, fid, GET))
 			continue;
 
