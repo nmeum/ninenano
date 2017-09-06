@@ -20,9 +20,12 @@ USEMODULE += inet_csum
 USEMODULE += lwip_ethernet lwip_netdev
 USEMODULE += lwip_sock_tcp
 USEMODULE += netdev_default
-USEMODULE += ps
 
 # Module required for unit test functions
 USEMODULE += embunit
 
-include $(RIOTBASE)/Makefile.include
+# Modules required for using the 9p component
+USEMODULE += 9p
+
+export NINEBASE := $(CURDIR)/../../..
+include $(NINEBASE)/Makefile.riot

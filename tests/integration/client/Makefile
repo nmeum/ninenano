@@ -23,12 +23,13 @@ USEMODULE += inet_csum
 USEMODULE += lwip_ethernet lwip_netdev
 USEMODULE += lwip_sock_tcp
 USEMODULE += netdev_default
-USEMODULE += ps
 
 # Module required for unit test functions
 USEMODULE += embunit
 
 # Module required for virtual file system layer
 USEMODULE += vfs
+USEMODULE += 9pfs
 
-include $(RIOTBASE)/Makefile.include
+export NINEBASE := $(CURDIR)/../../..
+include $(NINEBASE)/Makefile.riot
