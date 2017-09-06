@@ -396,7 +396,6 @@ typedef struct {
 } _9pctx;
 
 void _9pinit(_9pctx*, iofunc*, iofunc*);
-
 int _9pversion(_9pctx*);
 int _9pattach(_9pctx*, _9pfid**, char*, char*);
 int _9pclunk(_9pctx*, _9pfid*);
@@ -407,26 +406,5 @@ int _9pcreate(_9pctx*, _9pfid*, char*, int, int);
 ssize_t _9pread(_9pctx*, _9pfid*, char*, size_t);
 ssize_t _9pwrite(_9pctx*, _9pfid*, char*, size_t);
 int _9premove(_9pctx*, _9pfid*);
-
-void advbuf(_9ppkt*, size_t);
-void bufcpy(_9ppkt*, void*, size_t);
-
-_9pfid* fidtbl(_9pfid*, uint32_t, _9pfidop);
-_9pfid* newfid(_9pfid*);
-
-int pstring(char*, _9ppkt*);
-int pnstring(char*, size_t, _9ppkt*);
-int hstring(char*, uint16_t, _9ppkt*);
-int hqid(_9pqid*, _9ppkt*);
-
-void htop8(uint8_t, _9ppkt*);
-void htop16(uint16_t, _9ppkt*);
-void htop32(uint32_t, _9ppkt*);
-void htop64(uint64_t, _9ppkt*);
-
-void ptoh8(uint8_t *dest, _9ppkt*);
-void ptoh16(uint16_t *dest, _9ppkt*);
-void ptoh32(uint32_t *dest, _9ppkt*);
-void ptoh64(uint64_t *dest, _9ppkt*);
 
 #endif

@@ -5,7 +5,7 @@
 #include <sys/types.h>
 
 #include "9p.h"
-#include "compat.h"
+#include "9util.h"
 #include "byteorder.h"
 
 /**

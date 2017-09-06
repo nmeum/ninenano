@@ -7,8 +7,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "compat.h"
 #include "9p.h"
+#include "9util.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"

@@ -6,6 +6,7 @@
 #include "9p.h"
 #include "vfs.h"
 #include "9pfs.h"
+#include "9util.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"
