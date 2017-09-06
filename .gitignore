@@ -11,4 +11,5 @@ tests/integration.log
 
 docs/
 examples/9pfs-shell/bin
+examples/9p-unix/hello-client
 ninenano.a
