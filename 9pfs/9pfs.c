@@ -294,7 +294,7 @@ _9pfs_open(vfs_file_t *filp, const char *name, int flags, mode_t mode, const cha
 			goto ret;
 		}
 
-		if (_9pcreate(&fs->ctx, f, bname, mode, flags)) {
+		if (_9pcreate(&fs->ctx, f, bname, mode, fl)) {
 			_9pclunk(&fs->ctx, f);
 			r = -EACCES;
 			goto ret;
