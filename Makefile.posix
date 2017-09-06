@@ -9,8 +9,8 @@ CFLAGS ?= -O0 -g
 CFLAGS += -Iinclude -Icompat/include/POSIX
 CFLAGS += -std=c99 -D_XOPEN_SOURCE -Wpedantic -Wall -Wextra -Werror
 
-9RIOT.a: $(OBJS)
+ninenano.a: $(OBJS)
 	$(AR) rcs $@ $?
 
 clean:
-	$(RM) $(OBJS) 9RIOT.a
+	$(RM) $(OBJS) ninenano.a

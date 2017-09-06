@@ -1,5 +1,5 @@
 # Name of your application
-APPLICATION = 9RIOT
+APPLICATION = ninenano
 
 # Run tests of native only
 BOARD = native
@@ -25,7 +25,7 @@ USEMODULE += netdev_default
 USEMODULE += embunit
 
 # Modules required for using the 9p component
-USEMODULE += 9p
+USEMODULE += ninenano_9p
 
 export NINEBASE := $(CURDIR)/../../..
 include $(NINEBASE)/Makefile.riot

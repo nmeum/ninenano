@@ -25,7 +25,7 @@ USEMODULE += gnrc_ipv6_default
 USEMODULE += gnrc_tcp
 
 # Modules required for using 9pfs
-USEMODULE += 9pfs
+USEMODULE += ninenano_9pfs
 
 # Optional modules for debugging purposes
 USEMODULE += gnrc_icmpv6_echo
