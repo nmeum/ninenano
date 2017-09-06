@@ -1,6 +1,14 @@
 # Name of your application
 APPLICATION = 9pfs-shell
 
+# Address and port of protocol server
+NINEPFS_HOST ?= ::1
+NINEPFS_PORT ?= 5640
+
+# Define macros for address and port
+CFLAGS += -DNINEPFS_HOST="\"$(NINEPFS_HOST)\""
+CFLAGS += -DNINEPFS_PORT=$(NINEPFS_PORT)
+
 # Board for which the application should be compiled
 BOARD ?= native
 

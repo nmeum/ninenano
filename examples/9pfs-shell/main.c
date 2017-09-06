@@ -13,11 +13,11 @@
 #include "net/gnrc/tcp.h"
 
 #ifndef NINEPFS_HOST
-  #define NINEPFS_HOST "fe80::e806:5fff:feca:411c"
+  #error "NINEPFS_HOST was not defined."
 #endif
 
 #ifndef NINEPFS_PORT
-  #define NINEPFS_PORT 5640
+  #error "NINEPFS_PORT was not defined."
 #endif
 
 /**
