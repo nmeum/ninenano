@@ -6,6 +6,7 @@
 #include "9p.h"
 #include "vfs.h"
 #include "9pfs.h"
+#include "9util.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"
@@ -293,7 +294,7 @@ _9pfs_open(vfs_file_t *filp, const char *name, int flags, mode_t mode, const cha
 			goto ret;
 		}
 
-		if (_9pcreate(&fs->ctx, f, bname, mode, flags)) {
+		if (_9pcreate(&fs->ctx, f, bname, mode, fl)) {
 			_9pclunk(&fs->ctx, f);
 			r = -EACCES;
 			goto ret;

@@ -1,0 +1,16 @@
+CC ?= cc
+AR ?= ar
+RM ?= rm -f
+
+OBJS := 9p/util.o 9p/9p.o
+OBJS += $(patsubst %.c,%.o,$(wildcard compat/POSIX/*.c))
+
+CFLAGS ?= -O0 -g
+CFLAGS += -Iinclude -Icompat/include/POSIX
+CFLAGS += -std=c99 -D_XOPEN_SOURCE -Wpedantic -Wall -Wextra -Werror
+
+ninenano.a: $(OBJS)
+	$(AR) rcs $@ $?
+
+clean:
+	$(RM) $(OBJS) ninenano.a

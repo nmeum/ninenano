@@ -3,13 +3,13 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "xtimer.h"
-#include "random.h"
 #include "9p.h"
+#include "9util.h"
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"
@@ -122,7 +122,7 @@ do9p(_9pctx *ctx, _9ppkt *p)
 	 *   The tag should be NOTAG (value (ushort)~0) for a version message.
 	 */
 	p->tag = (p->type == Tversion) ?
-		_9P_NOTAG : random_uint32();
+		_9P_NOTAG : randu32();
 
 	assert(ctx->msize > p->len);
 	reallen = ctx->msize - p->len;
@@ -352,7 +352,7 @@ ioloop(_9pctx *ctx, _9pfid *f, char *buf, size_t count, _9ptype t)
 void
 _9pinit(_9pctx *ctx, iofunc *read, iofunc *write)
 {
-	random_init(xtimer_now().ticks32);
+	initrand();
 	memset(ctx->fids, 0, _9P_MAXFIDS * sizeof(_9pfid));
 
 	ctx->msize = _9P_MSIZE;

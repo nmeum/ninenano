@@ -4,23 +4,24 @@ CONNECTION. I AM PRETTY SURE THAT I AM NOT CAPABLE OF WRITING BUG-FREE C
 CODE SO PLEASE DON'T BLAME ME IF YOUR CONSTRAINED DEVICE BECOMES PART OF
 THE NEXT INTERNET OF THINGS BOTNET. KTHXBYE!
 
-9RIOT
-=====
+ninenano
+========
 
-Constrained client implementation of the 9P network protocol. This
-implementation is currently only targeting the [RIOT][3] operating
-system but should run on other platforms with minimal modifications. The
-code might be adjusted to be more portable by default in the future.
-
-9RIOT currently consists of two components:
+ninenano is a client implementation of the 9P network for [constrained
+devices][8]. It currently consists of two separated components:
 
 1. 9p: A client implementation of the 9P network protocol
 2. 9pfs: Virtual 9P file system using RIOTs VFS layer
 
-When writing IoT applications that utilize 9P as an application layer
-protocol it is probably sufficient to use the 9P component directly
-without the VFS layer. Doing so will spare you some bytes in the text
-segment.
+The 9p component works on the [RIOT][3] operating system and on various
+POSIX compatible operating systems. It uses only a small subset of the
+functions provided by the libc and should those also be portable to
+other operating systems and microcontroller frameworks. The 9pfs
+component uses RIOT's [VFS layer][7] and thus only works on RIOT.
+
+However, even on RIOT you might consider using the 9p component directly
+instead of 9pfs component since doing so will spare you some bytes in
+the text segment.
 
 Status
 ------
@@ -41,22 +42,24 @@ This implementation of the 9P protocol has the following limitations:
 Compilation
 -----------
 
-The library isn't currently integrated into RIOT as a pkg. To use this
-library in your RIOT application you therefore need to manually create
-such a package or copy the required C files to your application
-directory. The latter method is also used for the unit tests in this
-repository.
+For using this library on RIOT you should use the provided RIOT ninenano
+pkg. For compiling a static library for POSIX operating systems run the
+following command:
 
-When compiling the library their are a few CPP macros which can be
-defined to configure the library they are listed below:
+	$ make -f Makefile.posix
+
+A few CPP macros are provided for tweaking the size of the library,
+these can be passed by modifying the `CFLAGS` environment variable
+accordingly. Currently the following macros can be redefined:
 
 1. `_9P_MSIZE`: Maximum message size and therefore also equal to the
    buffer size used to store 9P messages.
 2. `_9P_MAXFIDS`: Maximum amount of open fids for a 9P connection.
 
-If you want to reduce the size of the library set those macros to a
-smaller value. In addition to that you can define `NDEBUG` to prevent
-some optional sanity checks form being included in the resulting binary.
+In addition to that you can define `NDEBUG` to prevent some optional
+sanity checks form being included in the resulting binary. Your
+application should be fine without them they only detect violations of
+invariants caused by programming errors.
 
 Usage
 -----
@@ -94,15 +97,16 @@ favorite web browser.
 Tests
 -----
 
-9RIOT comes with both unit and integration tests. The unit tests use the
-9P component directly while the integration tests use 9P through the
-9pfs component.
+ninenano comes with both unit and integration tests utilising RIOT's
+test framework. The unit tests use the 9p component directly while the
+integration tests use the 9p component indirectly through the 9pfs
+component.
 
-In order to run the tests you need to setup the toolchain for RIOTs
+In order to run the tests you need to setup the toolchain for RIOT's
 [native family][1]. Besides you need to install go `>= 1.5`, python
 `3.X` and the [pexpect][2] python package.
 
-Besides a tun devices needs to created:
+In addition to that a tun devices needs to created:
 
 	# ip tuntap add tap0 mode tap
 	# ip addr add fe80::e42a:1aff:feca:10ec dev tap0
@@ -140,3 +144,5 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 [4]: http://www.stack.nl/~dimitri/doxygen/
 [5]: http://riot-os.org/api/group__sys__vfs.html
 [6]: http://man.cat-v.org/plan_9/5/intro
+[7]: http://riot-os.org/api/group__sys__vfs.html
+[8]: https://tools.ietf.org/html/rfc7228

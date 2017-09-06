@@ -1,5 +1,5 @@
 # Name of your application
-APPLICATION = 9RIOT
+APPLICATION = ninenano
 
 # Run tests of native only
 BOARD = native
@@ -23,12 +23,13 @@ USEMODULE += inet_csum
 USEMODULE += lwip_ethernet lwip_netdev
 USEMODULE += lwip_sock_tcp
 USEMODULE += netdev_default
-USEMODULE += ps
 
 # Module required for unit test functions
 USEMODULE += embunit
 
-# Module required for virtual file system layer
+# Module required for using 9pfs
 USEMODULE += vfs
+USEMODULE += ninenano_9pfs
 
-include $(RIOTBASE)/Makefile.include
+export NINEBASE := $(CURDIR)/../../..
+include $(NINEBASE)/Makefile.riot

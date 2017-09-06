@@ -1,0 +1,16 @@
+ifneq (,$(filter ninenano_9pfs,$(USEMODULE)))
+	USEMODULE += ninenano_9p
+	DIRS += $(NINEBASE)/9pfs
+endif
+
+ifneq (,$(filter ninenano_9p,$(USEMODULE)))
+	DIRS += $(NINEBASE)/9p
+	USEMODULE += ninenano_compat
+	INCLUDES += -I$(NINEBASE)/include
+endif
+
+ifneq (,$(filter ninenano_compat,$(USEMODULE)))
+	DIRS += $(NINEBASE)/compat/RIOT
+endif
+
+include $(RIOTBASE)/Makefile.include
