@@ -1,6 +1,7 @@
 #ifndef NINEUTIL_H
 #define NINEUTIL_H
 
+#include "9p.h"
 #include <stdint.h>
 
 void advbuf(_9ppkt*, size_t);
