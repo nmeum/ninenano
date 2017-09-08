@@ -8,16 +8,16 @@ ninenano
 ========
 
 ninenano is a client implementation of the 9P network for [constrained
-devices][8]. It currently consists of two separated components:
+devices][7]. It currently consists of two separated components:
 
 1. 9p: A client implementation of the 9P network protocol
 2. 9pfs: Virtual 9P file system using RIOTs VFS layer
 
 The 9p component works on the [RIOT][3] operating system and on various
 POSIX compatible operating systems. It uses only a small subset of the
-functions provided by the libc and should those also be portable to
+functions provided by the libc and should therefore also be portable to
 other operating systems and microcontroller frameworks. The 9pfs
-component uses RIOT's [VFS layer][7] and thus only works on RIOT.
+component uses RIOT's [VFS layer][5] and thus only works on RIOT.
 
 However, even on RIOT you might consider using the 9p component directly
 instead of 9pfs component since doing so will spare you some bytes in
@@ -144,5 +144,4 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 [4]: http://www.stack.nl/~dimitri/doxygen/
 [5]: http://riot-os.org/api/group__sys__vfs.html
 [6]: http://man.cat-v.org/plan_9/5/intro
-[7]: http://riot-os.org/api/group__sys__vfs.html
-[8]: https://tools.ietf.org/html/rfc7228
+[7]: https://tools.ietf.org/html/rfc7228
