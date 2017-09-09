@@ -12,22 +12,20 @@ initrand(void)
 	uint8_t seed;
 	int fd;
 
-	/* If we can't read from /dev/random random(3) will use the
-	 * value 1 for seeding which not optimal but sufficient. */
+	/* If we can't read from /dev/random we will a hardcode value
+	 * for seeding which not optimal but sufficient. */
 
 	if ((fd = open("/dev/random", O_RDONLY)) == -1)
-		return;
-	if (read(fd, &seed, 1) != 1) {
-		close(fd);
-		return;
-	}
+		seed = 23;
+	if (read(fd, &seed, 1) != 1)
+		seed = 42;
 
 	close(fd);
-	srandom(seed);
+	srand(seed);
 }
 
 uint32_t
 randu32(void)
 {
-	return random();
+	return rand();
 }
