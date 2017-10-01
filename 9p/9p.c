@@ -350,7 +350,7 @@ ioloop(_9pctx *ctx, _9pfid *f, char *buf, size_t count, _9ptype t)
  * @param ctx 9P connection context which should be initialized.
  */
 void
-_9pinit(_9pctx *ctx, iofunc *read, iofunc *write)
+_9pinit(_9pctx *ctx, iofunc read, iofunc write)
 {
 	initrand();
 	memset(ctx->fids, 0, _9P_MAXFIDS * sizeof(_9pfid));

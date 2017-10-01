@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 #include <stddef.h>
+
 #include <sys/stat.h>
+#include <sys/types.h>
 
 /**
  * 9P version implemented by this library.
@@ -342,7 +344,7 @@ typedef struct {
  * @return `0`, if no read data is available, but everything is in order.
  * @return A negative errno value on error.
  */
-typedef ssize_t (iofunc)(void *buf, size_t bufsiz);
+typedef ssize_t (*iofunc)(void *buf, size_t bufsiz);
 
 /**
  * Connection context for a 9P connection.
@@ -358,12 +360,12 @@ typedef struct {
 	/**
 	 * Function used to receive R-messages.
 	 */
-	iofunc *read;
+	iofunc read;
 
 	/**
 	 * Function used to send T-messages.
 	 */
-	iofunc *write;
+	iofunc write;
 
 	/**
 	 * From version(5):
@@ -395,7 +397,7 @@ typedef struct {
 	_9pfid fids[_9P_MAXFIDS];
 } _9pctx;
 
-void _9pinit(_9pctx*, iofunc*, iofunc*);
+void _9pinit(_9pctx*, iofunc, iofunc);
 int _9pversion(_9pctx*);
 int _9pattach(_9pctx*, _9pfid**, char*, char*);
 int _9pclunk(_9pctx*, _9pfid*);
