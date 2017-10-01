@@ -5,6 +5,6 @@ server: src/github.com/nmeum/ninenano
 
 src/github.com/nmeum/ninenano: $(GOPATH)
 	mkdir -p $(shell dirname $@)
-	ln -s $< $@
+	ln -fs $< $@
 
 .PHONY: server
