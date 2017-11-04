@@ -20,10 +20,6 @@
   #error "NINEPFS_PORT was not defined."
 #endif
 
-#ifndef NINEPFS_TIMEOUT
-  #define NINEPFS_TIMEOUT 10 * 10000000
-#endif
-
 /**
  * GNRC transmission control block.
  */
@@ -40,13 +36,15 @@ extern int _netif_config(int argc, char **argv);
 static ssize_t
 recvfn(void *buf, size_t count)
 {
-	return gnrc_tcp_recv(&tcb, buf, count, NINEPFS_TIMEOUT);
+	return gnrc_tcp_recv(&tcb, buf,
+		count, GNRC_TCP_CONNECTION_TIMEOUT_DURATION);
 }
 
 static ssize_t
 sendfn(void *buf, size_t count)
 {
-	return gnrc_tcp_send(&tcb, buf, count, NINEPFS_TIMEOUT);
+	return gnrc_tcp_send(&tcb, buf,
+		count, GNRC_TCP_CONNECTION_TIMEOUT_DURATION);
 }
 
 int
