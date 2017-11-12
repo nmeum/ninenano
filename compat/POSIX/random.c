@@ -15,12 +15,16 @@ initrand(void)
 	/* If we can't read from /dev/random we will use a hardcode
 	 * value for seeding which not optimal but sufficient. */
 
-	if ((fd = open("/dev/random", O_RDONLY)) == -1)
+	if ((fd = open("/dev/random", O_RDONLY)) == -1) {
 		seed = 23;
+		goto srand;
+	}
+
 	if (read(fd, &seed, 1) != 1)
 		seed = 42;
-
 	close(fd);
+
+srand:
 	srand(seed);
 }
 
