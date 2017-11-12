@@ -711,7 +711,7 @@ err:
  * @return `0` on success, on error a negative errno is returned.
  */
 int
-_9popen(_9pctx *ctx, _9pfid *f, int flags)
+_9popen(_9pctx *ctx, _9pfid *f, uint8_t flags)
 {
 	int r;
 	_9ppkt pkt;
@@ -754,7 +754,7 @@ _9popen(_9pctx *ctx, _9pfid *f, int flags)
  *   afterwards. See ::_9popen.
  */
 int
-_9pcreate(_9pctx *ctx, _9pfid *f, char *name, int perm, int flags)
+_9pcreate(_9pctx *ctx, _9pfid *f, char *name, uint32_t perm, uint8_t flags)
 {
 	int r;
 	_9ppkt pkt;
