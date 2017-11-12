@@ -655,6 +655,7 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 
 	pkt.buf = nwname;
 	pkt.len += BIT16SZ;
+	assert(n <= UINT16_MAX);
 	htop16(n, &pkt);
 
 	if ((r = do9p(ctx, &pkt)))
