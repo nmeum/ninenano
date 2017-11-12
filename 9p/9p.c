@@ -262,7 +262,7 @@ newfile(_9pctx *ctx, _9pfid *f, _9ppkt *pkt)
  * 	file.
  * @param t Type of the operation which should be performed.
  */
-static int
+static ssize_t
 ioloop(_9pctx *ctx, _9pfid *f, char *buf, size_t count, _9ptype t)
 {
 	int r;
