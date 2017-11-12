@@ -643,7 +643,9 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 		cur = &path[i];
 		if (!(sep = strchr(cur, _9P_PATHSEP)))
 			sep = &path[len - 1] + 1; /* XXX */
+
 		elen = sep - cur;
+		assert(elen >= 0);
 
 		if (pnstring(cur, elen, &pkt))
 			return -EOVERFLOW;
