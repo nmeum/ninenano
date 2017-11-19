@@ -2,9 +2,12 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#include "9util.h"
 
 void
 initrand(void)
@@ -31,5 +34,14 @@ srand:
 uint32_t
 randu32(void)
 {
-	return rand();
+	int ret;
+
+	/* From rand(3):
+	 *   The rand() function returns a result in the range of 0 to
+	 *   `RAND_MAX`.
+	 */
+	ret = rand();
+	assert(ret >= 0);
+
+	return (uint32_t)rand();
 }

@@ -122,7 +122,7 @@ do9p(_9pctx *ctx, _9ppkt *p)
 	 *   The tag should be NOTAG (value (ushort)~0) for a version message.
 	 */
 	p->tag = (p->type == Tversion) ?
-		_9P_NOTAG : randu32();
+		_9P_NOTAG : (uint16_t)randu32();
 
 	assert(ctx->msize > p->len);
 	reallen = ctx->msize - p->len;
@@ -138,7 +138,7 @@ do9p(_9pctx *ctx, _9ppkt *p)
 
 	DEBUG("Sending %"PRIu32" bytes to server...\n", reallen);
 	if ((ret = ctx->write(ctx->buffer, reallen)) < 0)
-		return ret;
+		return (int)ret;
 
 	/* Values will be overwritten by _9pheader. */
 	ttype = p->type;
@@ -146,18 +146,18 @@ do9p(_9pctx *ctx, _9ppkt *p)
 
 	DEBUG("Reading from server...\n");
 	if ((ret = ctx->read(ctx->buffer, ctx->msize)) < 0)
-		return ret;
+		return (int)ret;
 
 	/* Maximum length of a 9P message is 2^32. */
 	if ((size_t)ret > UINT32_MAX)
 		return -EMSGSIZE;
 
-	p->len = ret;
+	p->len = (uint32_t)ret;
 	p->buf = ctx->buffer;
 
 	DEBUG("Read %zu bytes from server, parsing them...\n", ret);
 	if ((ret = _9pheader(p)))
-		return ret;
+		return (int)ret;
 
 	if (p->tag != ttag) {
 		DEBUG("Tag mismatch (%"PRIu8" vs. %"PRIu8")\n", p->tag, ttag);
@@ -282,8 +282,9 @@ ioloop(_9pctx *ctx, _9pfid *f, char *buf, size_t count, _9ptype t)
 		htop32(f->fid, &pkt);
 		htop64(f->off, &pkt);
 
+		assert(n <= count);
 		if (count - n <= UINT32_MAX)
-			pcnt = count - n;
+			pcnt = (uint32_t)(count - n);
 		else
 			pcnt = UINT32_MAX;
 
@@ -337,7 +338,7 @@ ioloop(_9pctx *ctx, _9pfid *f, char *buf, size_t count, _9ptype t)
 			break;
 	}
 
-	return n;
+	return (ssize_t)n;
 }
 
 /**@}*/
@@ -634,7 +635,7 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 	advbuf(&pkt, BIT16SZ);
 
 	/* generate nwname*(wname[s]) */
-	for (n = i = 0; i < len; n++, i += elen + 1) {
+	for (n = i = 0; i < len; n++, i += (size_t)elen + 1) {
 		if (n >= _9P_MAXWEL) {
 			r = -ENAMETOOLONG;
 			goto err;
@@ -647,7 +648,7 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 		elen = sep - cur;
 		assert(elen >= 0);
 
-		if (pnstring(cur, elen, &pkt))
+		if (pnstring(cur, (size_t)elen, &pkt))
 			return -EOVERFLOW;
 	}
 
@@ -656,7 +657,7 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 	pkt.buf = nwname;
 	pkt.len += BIT16SZ;
 	assert(n <= UINT16_MAX);
-	htop16(n, &pkt);
+	htop16((uint16_t)n, &pkt);
 
 	if ((r = do9p(ctx, &pkt)))
 		goto err;

@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#include "byteorder.h"
+
 uint16_t
 byteorder_swaps(uint16_t v)
 {

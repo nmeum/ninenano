@@ -1,7 +1,6 @@
-#include <stdint.h>
-
 #include "xtimer.h"
 #include "random.h"
+#include "9util.h"
 
 void
 initrand(void)
