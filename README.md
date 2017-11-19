@@ -30,14 +30,22 @@ This implementation of the 9P protocol has the following limitations:
 
 1. It only sends one T-message at a time and waits for an R-message from
    the server before sending additional T-messages.
-2. `flush(5)` is not implemented because due to the first limitation it
-   wasn't needed.
+2. `flush(5)` is not implemented because it wasn't needed due to the
+   first limitation.
 3. Only files with a maximum amount of sixteen path elements can be
    accessed using `_9pwalk`.
 4. Proper handling of `Rerror` messages is not implemented.
 5. `Twstat` is currently not implemented.
 
 *The fourth and fifth limitation might be resolved in feature releases.*
+
+Supported compilers
+-------------------
+
+In theory this code should compile with any C99 compiler, however, the
+compatibility layer for POSIX compatible operating systems uses gcc
+builtins for byteswapping. Therefore the code only compiles with recent
+version of gcc and clang.
 
 Compilation
 -----------
