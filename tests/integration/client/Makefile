@@ -13,9 +13,6 @@ RIOTBASE ?= $(CURDIR)/../../../vendor/RIOT
 # CFLAGS for debugging purposes
 CFLAGS += -DDEVELHELP -ggdb
 
-# CFLAGS for configuration purposes
-CFLAGS += -DPORT=5555
-
 # Modules required for using sock_tcp
 USEMODULE += ipv6_addr
 USEMODULE += lwip_ipv6_autoconfig
