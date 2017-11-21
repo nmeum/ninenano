@@ -137,13 +137,14 @@ newfid(_9pfid *fids)
 	uint32_t fid;
 
 	for (i = 1; i <= _9P_MAXFIDS; i++) {
-		fid = randu32() - 1; /* fid must not have value 0. */
-		if (fidtbl(fids, fid, GET))
-			continue;
+		fid = randu32();
+		if (!fid) fid++;
 
 		/* TODO room for optimization don't call fidtbl twice. */
-		r = fidtbl(fids, fid, ADD);
-		if (!r) break;
+		if (fidtbl(fids, fid, GET))
+			continue;
+		if (!(r = fidtbl(fids, fid, ADD)))
+			break;
 
 		r->fid = fid;
 		return r;
