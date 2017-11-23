@@ -509,13 +509,27 @@ test_9p__rwalk_invalid_len(void)
 }
 
 static void
-test_9p__rwalk_path_too_long(void)
+test_9p__rwalk_path_too_many_elems(void)
 {
 	_9pfid *f;
 	char *path;
 
 	path = "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17";
 	TEST_ASSERT_EQUAL_INT(-ENAMETOOLONG, _9pwalk(&ctx, &f, path));
+	TEST_ASSERT_EQUAL_INT(0, cntfids(ctx.fids));
+}
+
+static void
+test_9p__rwalk_path_too_long(void)
+{
+	_9pfid *f;
+	char path[_9P_MSIZE];
+
+	memset(path, 'a', sizeof(path));
+	path[5] = '/';
+	path[sizeof(path) - 1] = '\0';
+
+	TEST_ASSERT_EQUAL_INT(-EOVERFLOW, _9pwalk(&ctx, &f, path));
 	TEST_ASSERT_EQUAL_INT(0, cntfids(ctx.fids));
 }
 
@@ -754,6 +768,7 @@ tests_9p_tests(void)
 		new_TestFixture(test_9p__rwalk_rootfid),
 		new_TestFixture(test_9p__rwalk_invalid_len),
 		new_TestFixture(test_9p__rwalk_path_too_long),
+		new_TestFixture(test_9p__rwalk_path_too_many_elems),
 		new_TestFixture(test_9p__rwalk_nwqid_too_large),
 
 		new_TestFixture(test_9p__ropen_success),
