@@ -607,10 +607,9 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 {
 	int r;
 	char *cur, *sep;
-	size_t n, i, len;
+	size_t n, i, len, elen;
 	uint8_t *nwname;
 	uint16_t nwqid;
-	ptrdiff_t elen;
 	_9pfid *fid;
 	_9ppkt pkt;
 
@@ -635,7 +634,7 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 	advbuf(&pkt, BIT16SZ);
 
 	/* generate nwname*(wname[s]) */
-	for (n = i = 0; i < len; n++, i += (size_t)elen + 1) {
+	for (n = i = 0; i < len; n++, i += elen + 1) {
 		if (n >= _9P_MAXWEL) {
 			r = -ENAMETOOLONG;
 			goto err;
@@ -645,10 +644,10 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 		if (!(sep = strchr(cur, _9P_PATHSEP)))
 			sep = &path[len];
 
-		elen = sep - cur;
-		assert(elen >= 0);
+		assert(sep - cur >= 0);
+		elen = (size_t)(sep - cur);
 
-		if (pnstring(cur, (size_t)elen, &pkt))
+		if (pnstring(cur, elen, &pkt))
 			return -EOVERFLOW;
 	}
 
