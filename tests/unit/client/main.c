@@ -460,6 +460,18 @@ test_9p__rstat_success(void)
 }
 
 static void
+test_9p__rstat_too_short(void)
+{
+	_9pfid f;
+	struct stat st;
+
+	f.fid = 1337;
+
+	setcmd("rstat_too_short\n");
+	TEST_ASSERT_EQUAL_INT(-EBADMSG, _9pstat(&ctx, &f, &st));
+}
+
+static void
 test_9p__rwalk_success(void)
 {
 	_9pfid *f;
@@ -736,6 +748,7 @@ tests_9p_tests(void)
 		new_TestFixture(test_9p__rattach_invalid_len),
 
 		new_TestFixture(test_9p__rstat_success),
+		new_TestFixture(test_9p__rstat_too_short),
 
 		new_TestFixture(test_9p__rwalk_success),
 		new_TestFixture(test_9p__rwalk_rootfid),

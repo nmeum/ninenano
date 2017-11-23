@@ -27,7 +27,8 @@ var ctlcmds = map[string]ServerReply{
 	"rattach_success":     {RattachSuccess, protocol.Tattach},
 	"rattach_invalid_len": {RattachInvalidLength, protocol.Tattach},
 
-	"rstat_success": {RstatSuccess, protocol.Tstat},
+	"rstat_success":   {RstatSuccess, protocol.Tstat},
+	"rstat_too_short": {RstatTooShort, protocol.Tstat},
 
 	"rwalk_success":         {RwalkSuccess, protocol.Twalk},
 	"rwalk_invalid_len":     {RwalkInvalidLen, protocol.Twalk},
@@ -322,6 +323,28 @@ func RstatSuccess(b *bytes.Buffer) error {
 	protocol.Marshaldir(&B, dir)
 
 	protocol.MarshalRstatPkt(b, t, B.Bytes())
+	return nil
+}
+
+// Replies with an Rstat message that is too short to be valid. The
+// client must reject this message.
+func RstatTooShort(b *bytes.Buffer) error {
+	_, t, err := protocol.UnmarshalTstatPkt(b)
+	if err != nil {
+		return err
+	}
+
+	var D protocol.Dir
+	var B bytes.Buffer
+
+	protocol.Marshaldir(&B, D)
+	protocol.MarshalRstatPkt(b, t, B.Bytes())
+
+	{
+		var l uint64 = 57 // _9P_MINSTSIZ + _9P_HEADSIZ - 1
+		copy(b.Bytes(), []byte{uint8(l), uint8(l >> 8), uint8(l >> 16), uint8(l >> 24)})
+	}
+
 	return nil
 }
 
