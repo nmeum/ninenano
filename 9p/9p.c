@@ -426,15 +426,15 @@ _9pversion(_9pctx *ctx)
 		return -EOVERFLOW;
 	}
 
-	/* From version(5):
-	 *  If the server does not understand the client's version
-	 *  string, it should respond with an Rversion message (not
-	 *  Rerror) with the version string the 7 characters `unknown`.
-         */
 	if (hstring(ver, _9P_VERLEN, &pkt))
 		return -EBADMSG;
-
 	DEBUG("Version string reported by server: %s\n", ver);
+
+	/* From version(5):
+	 *   If the server does not understand the client's version
+	 *   string, it should respond with an Rversion message (not
+	 *   Rerror) with the version string the 7 characters `unknown`.
+         */
 	if (!strcmp(ver, "unknown"))
 		return -ENOPROTOOPT;
 
