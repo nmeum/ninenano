@@ -647,8 +647,10 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 		assert(sep - cur >= 0);
 		elen = (size_t)(sep - cur);
 
-		if (pnstring(cur, elen, &pkt))
-			return -EOVERFLOW;
+		if (pnstring(cur, elen, &pkt)) {
+			r = -EOVERFLOW;
+			goto err;
+		}
 	}
 
 	DEBUG("Constructed Twalk with %zu elements\n", n);
