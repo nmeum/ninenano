@@ -568,6 +568,18 @@ test_9p__rcreate_success(void)
 }
 
 static void
+test_9p__rcreate_name_too_long(void)
+{
+	_9pfid f;
+	char name[_9P_MSIZE - _9P_HEADSIZ - BIT32SZ - BIT16SZ];
+
+	memset(name, 'a', sizeof(name));
+	name[sizeof(name) - 1] = '\0';
+
+	TEST_ASSERT_EQUAL_INT(-EOVERFLOW, _9pcreate(&ctx, &f, name, ORDWR, 0));
+}
+
+static void
 test_9p__rread_success(void)
 {
 	_9pfid f;
@@ -774,6 +786,7 @@ tests_9p_tests(void)
 		new_TestFixture(test_9p__ropen_success),
 
 		new_TestFixture(test_9p__rcreate_success),
+		new_TestFixture(test_9p__rcreate_name_too_long),
 
 		new_TestFixture(test_9p__rread_success),
 		new_TestFixture(test_9p__rread_with_offset1),
