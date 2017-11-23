@@ -209,6 +209,7 @@ fidrem(_9pctx *ctx, _9pfid *f, _9ptype t)
 	 * Therefore we don't need to parse anything here.
 	 */
 
+	/* fid wasn't allocated by us so don't use `fid->fid = 0` here */
 	if (!fidtbl(ctx->fids, f->fid, DEL))
 		return -EBADF;
 
@@ -696,9 +697,7 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 	return 0;
 
 err:
-	fid = fidtbl(ctx->fids, fid->fid, DEL);
-	assert(fid != NULL);
-
+	fid->fid = 0; /* mark fid as free. */
 	return r;
 }
 
