@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -31,6 +32,8 @@ breakpath(char *buf, size_t bufsiz, const char *path, char **dname)
 	*dname = buf;
 
 	bname = strrchr(buf, '/');
+	assert(bname != NULL);
+
 	*bname++ = '\0';
 	return bname;
 }
