@@ -31,7 +31,7 @@ static gnrc_tcp_tcb_t tcb;
 static _9pfs fs;
 
 /* import "ifconfig" shell command, used for printing addresses */
-extern int _netif_config(int argc, char **argv);
+extern int _gnrc_netif_config(int argc, char **argv);
 
 static ssize_t
 recvfn(void *buf, size_t count)
@@ -68,7 +68,7 @@ main(void)
 	xtimer_sleep(3);
 
 	puts("Configured network interfaces:");
-	_netif_config(0, NULL);
+	_gnrc_netif_config(0, NULL);
 
 	gnrc_tcp_tcb_init(&tcb);
 	if ((ret = gnrc_tcp_open_active(&tcb, AF_INET6,
