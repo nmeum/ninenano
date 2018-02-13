@@ -32,11 +32,12 @@ USEMODULE += auto_init_gnrc_netif
 USEMODULE += gnrc_ipv6_default
 USEMODULE += gnrc_tcp
 
-# Modules required for using 9pfs
-USEMODULE += ninenano_9pfs
-
 # Optional modules for debugging purposes
 USEMODULE += gnrc_icmpv6_echo
 
-export NINEBASE := $(CURDIR)/../..
-include $(NINEBASE)/Makefile.riot
+# Curse needed to make ninenano work
+DIRS += ../../mk/RIOT
+USEMODULE += ninenano
+CFLAGS += -I../../include
+
+include $(RIOTBASE)/Makefile.include

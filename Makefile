@@ -4,13 +4,13 @@ ifeq ($(TESTADDR),)
   $(error 'TESTADDR' environment variable isn't set)
 endif
 
-test: all
+test: testsuite
 	cd tests/ && ./run_tests.sh "$(TESTADDR)"
 
-all:
+testsuite:
 	"$(MAKE)" -C tests/unit/client
 	"$(MAKE)" -C tests/unit/server
 	"$(MAKE)" -C tests/integration/client
 	"$(MAKE)" -C tests/integration/server
 
-.PHONY: all test
+.PHONY: test testsuite

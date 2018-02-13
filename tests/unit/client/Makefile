@@ -24,8 +24,9 @@ USEMODULE += netdev_default
 # Module required for unit test functions
 USEMODULE += embunit
 
-# Modules required for using the 9p component
-USEMODULE += ninenano_9p
+# Curse needed to make ninenano work
+DIRS += ../../../mk/RIOT
+USEMODULE += ninenano
+CFLAGS += -I../../../include
 
-export NINEBASE := $(CURDIR)/../../..
-include $(NINEBASE)/Makefile.riot
+include $(RIOTBASE)/Makefile.include
