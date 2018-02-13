@@ -6,5 +6,9 @@ CFLAGS += -I../../include -I../../compat/include/POSIX
 CFLAGS += -std=c99 -D_XOPEN_SOURCE -Werror \
 	  -Wpedantic -Wall -Wextra -Wconversion
 
+ifeq "$(findstring clang,$(shell $(CC) --version))" "clang"
+	CFLAGS += -Weverything -Wno-padded -Wno-disabled-macro-expansion
+endif
+
 ninenano.a: $(OBJS)
 	$(AR) rcs $@ $?

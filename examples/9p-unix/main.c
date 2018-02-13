@@ -28,7 +28,7 @@ sendfn(void *buf, size_t count)
 	return write(sockfd, buf, count);
 }
 
-int
+static int
 writestr(void)
 {
 	int r;
