@@ -43,10 +43,10 @@
 void
 advbuf(_9ppkt *pkt, size_t off)
 {
-	assert(pkt->len - off <= pkt->len);
+	assert(off <= UINT32_MAX && off <= pkt->len);
 
 	pkt->buf += off;
-	pkt->len -= off;
+	pkt->len -= (uint32_t)off;
 }
 
 /**

@@ -3,7 +3,8 @@ VPATH += ../../9p:../../compat/POSIX
 
 CFLAGS ?= -O0 -g
 CFLAGS += -I../../include -I../../compat/include/POSIX
-CFLAGS += -std=c99 -D_XOPEN_SOURCE -Wpedantic -Wall -Wextra -Werror
+CFLAGS += -std=c99 -D_XOPEN_SOURCE -Werror \
+	  -Wpedantic -Wall -Wextra -Wconversion
 
 ninenano.a: $(OBJS)
 	$(AR) rcs $@ $?

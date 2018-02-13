@@ -45,7 +45,7 @@ writestr(void)
 			S_IRUSR|S_IWUSR, OWRITE|OTRUNC)))
 		return r;
 
-	if ((r = _9pwrite(&ctx, fid, NINEPFS_STR,
+	if ((r = (int)_9pwrite(&ctx, fid, NINEPFS_STR,
 			strlen(NINEPFS_STR))) < 0)
 		return r;
 

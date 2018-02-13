@@ -686,7 +686,7 @@ _9pwalk(_9pctx *ctx, _9pfid **dest, char *path)
 
 	/* Skip to the last qid. */
 	if (nwqid) {
-		advbuf(&pkt, (nwqid - 1) * _9P_QIDSIZ);
+		advbuf(&pkt, (size_t)((nwqid - 1) * _9P_QIDSIZ));
 		if (hqid(&fid->qid, &pkt)) {
 			r = -EBADMSG;
 			goto err;
