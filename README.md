@@ -54,7 +54,7 @@ For using this library on RIOT you should use the provided RIOT ninenano
 pkg. For compiling a static library for POSIX operating systems run the
 following command:
 
-	$ make -f Makefile.posix
+	$ make -C mk/POSIX
 
 A few CPP macros are provided for tweaking the size of the library,
 these can be passed by modifying the `CFLAGS` environment variable
