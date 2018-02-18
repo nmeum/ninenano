@@ -10,5 +10,8 @@ ifeq "$(findstring clang,$(shell $(CC) --version))" "clang"
 	CFLAGS += -Weverything -Wno-padded -Wno-disabled-macro-expansion
 endif
 
+%.o: %.c $(HEADERS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
 ninenano.a: $(OBJS)
 	$(AR) rcs $@ $?
