@@ -43,5 +43,5 @@ randu32(void)
 	ret = rand();
 	assert(ret >= 0);
 
-	return (uint32_t)rand();
+	return (uint32_t)ret;
 }
