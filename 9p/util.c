@@ -272,7 +272,7 @@ ptoh64(uint64_t *dest, _9ppkt *pkt)
 int
 pnstring(char *str, size_t len, _9ppkt *pkt)
 {
-	if (len + BIT16SZ > pkt->len)
+	if (len + BIT16SZ > pkt->len || len > UINT16_MAX)
 		return -1;
 
 	htop16((uint16_t)len, pkt);
