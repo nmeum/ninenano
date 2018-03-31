@@ -33,7 +33,7 @@
  */
 
 /**
- * Advances the position in the packet buffer. The macro takes care of
+ * Advances the position in the packet buffer, it takes care of
  * decrementing the length field of the packet as well.
  *
  * @param pkt Pointer to a packet in which the buffer position should be
