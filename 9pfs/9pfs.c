@@ -425,8 +425,9 @@ _9pfs_readdir(vfs_DIR *dirp, vfs_dirent_t *entry)
 	pkt.len = n;
 	pkt.buf = (unsigned char*)dest;
 
-	/* Skip all the information we don't need. */
+	/* Skip all unneeded information. */
 	advbuf(&pkt, 2 * BIT16SZ + BIT32SZ + _9P_QIDSIZ + 3 * BIT32SZ + BIT64SZ);
+
 	if (hstring(entry->d_name, sizeof(entry->d_name), &pkt)) {
 		r = -EIO;
 		goto ret;

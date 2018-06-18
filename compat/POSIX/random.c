@@ -15,8 +15,9 @@ initrand(void)
 	uint8_t seed;
 	int fd;
 
-	/* If we can't read from /dev/random we will use a hardcode
-	 * value for seeding which not optimal but sufficient. */
+	/* If reading from /dev/random isn't possible a hardcoded
+	 * value will be used for seeding instead which is not
+	 * optimal but sufficient. */
 
 	if ((fd = open("/dev/random", O_RDONLY)) == -1) {
 		seed = 23;

@@ -9,14 +9,16 @@
 #include "byteorder.h"
 
 /**
+ * @def _9p_swap
+ *
  * From intro(5):
  *   Each message consists of a sequence of bytes. Two-, four-, and
  *   eight-byte fields hold unsigned integers represented in
  *   little-endian order (least significant byte first).
  *
- * Since we want to write an endian-agnostic implementation we define a
- * macro called `_9p_swap` which is similar to `_byteorder_swap` but
- * doesn't swap the byte order on little endian plattforms.
+ * This implementation is supposed to be endian-agnostic. Therefore a
+ * macro is required to swap the byte order on big endian plattforms but
+ * retains it on little endian plattforms.
  */
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   #define _9p_swap(V, T) (V)
@@ -316,17 +318,17 @@ pstring(char *str, _9ppkt *pkt)
  *   The notation string[s] (using a literal s character) is shorthand
  *   for s[2] followed by s bytes of UTF-8 text.
  *
- * We thus read the first two bytes of the memory location pointed to by
- * the `buf` field of the given 9P packet. We use those two bytes to
- * determine the length of the string. If this length exceeds the packet
- * length or the given parameter `n` an error is returned. Otherwise we
- * copy the bytes after the length field to the given destination address.
+ * This the first two bytes of the memory location pointed to by the
+ * `buf` field of the given 9P packet are read and used to determine the
+ * length of the string. If this length exceeds the packet length or the
+ * given parameter @p n an error is returned. Otherwise the bytes after
+ * the length specifier are copied to the given destination address.
  *
  * The parameter `n` is a `uint16_t` value because the maximum length of
  * a 9P string is `2^16` since the length field consists of 2 bytes.
  *
  * @param dest Pointer to memory location to store string in. The string
- *   will always be null-terminated unless an error has occured.
+ *   will always be null-terminated unless an error has occurred.
  * @param n Size of the given buffer.
  * @param pkt 9P packet to read string from.
  * @return `0` on success.

@@ -39,9 +39,9 @@
  *   files on the same server hierarchy are the same if and only if
  *   their qids are the same.
  *
- * We need to map fids to qids, we do this using a primitve hash table
- * implementation. The amount of maximum entries in this hash table can
- * be tweaked by defining this macro.
+ * Fids need to be mapped to qids, this is achieved using a primitive
+ * hash table. The amount of maximum entries in this table can be
+ * tweaked by redefining this macro.
  */
 #ifndef _9P_MAXFIDS
   #define _9P_MAXFIDS 16
@@ -108,9 +108,9 @@ enum {
 		+ 3 * BIT32SZ + BIT64SZ + 4 * BIT16SZ,
 
 	/**
-	 * Maximum length of a version string in a R-message. The
-	 * longest valid version string is the 7 characters `unknown`.
-	 * In addition to that we need to reserve one-byte for the
+	 * Maximum length of a version string in an R-message. The
+	 * longest valid version string is the 7 characters `unknown`
+	 * and additional byte is needed to store the terminating
 	 * nullbyte.
 	 */
 	_9P_VERLEN = 8,
@@ -134,10 +134,10 @@ enum {
 	_9P_PATHSEP = '/',
 
 	/**
-	 * Minimum msize we are able to handle. Only the Rwrite and
-	 * Rread message support sending more than one message for a
-	 * request. Therefore all other message types have to fit within
-	 * this limit.
+	 * The library assumes that all T-Messages expect Tread and
+	 * Twrite can be transmitted in a single PDU. The minmum msize
+	 * required to ensure that this is the case is defined by this
+	 * value.
 	 */
 	_9P_MINSIZE = 64,
 };
@@ -373,26 +373,20 @@ typedef struct {
 	 *   the maximum length, in bytes, it will ever generate or
 	 *   expect to receive in a single 9P message.
 	 *
-	 * The msize we are suggestion to the server is defined by the
-	 * macro ::_9P_MSIZE for the unlikly event that the server
-	 * choosen an msize smaller than the one we are suggesting we
-	 * are storing the msize actually used for the communication in
-	 * this variable.
+	 * The msize suggested to the server is defined by the macro
+	 * ::_9P_MSIZE. Since the server can choose an msize smaller
+	 * than the one suggested, the actual msize used for the
+	 * communication is stored in this variable.
 	 *
-	 * It is declared with the initial value ::_9P_MSIZE to make it
+	 * It is initialized with the value of ::_9P_MSIZE to make it
 	 * possible to use this variable as an argument to the read
 	 * function even before a session is established.
 	 */
 	uint32_t msize;
 
 	/**
-	 * As with file descriptors, we need to store currently open
-	 * fids somehow. This is done in this static buffer. This buffer
-	 * should only be accessed using the ::fidtbl function it should
-	 * never be modified directly.
-	 *
-	 * This buffer is not static because it is used in the ::fidtbl
-	 * function from `util.c`.
+	 * This buffer is used for storing open fids. It should only be
+	 * accessed and manipulated using the ::fidtbl function.
 	 */
 	_9pfid fids[_9P_MAXFIDS];
 } _9pctx;

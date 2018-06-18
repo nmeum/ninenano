@@ -205,8 +205,8 @@ fidrem(_9pctx *ctx, _9pfid *f, _9ptype t)
 	/* From intro(5):
 	 *   size[4] Rclunk|Rremove tag[2]
 	 *
-	 * These first seven bytes are already parsed by do9p.
-	 * Therefore we don't need to parse anything here.
+	 * The first seven bytes are already parsed by the do9P
+	 * function. Thus nothing needs to be done here.
 	 */
 
 	/* fid wasn't allocated by us so don't use `fid->fid = 0` here */
@@ -247,10 +247,10 @@ newfile(_9pctx *ctx, _9pfid *f, _9ppkt *pkt)
 }
 
 /**
- * Only a maximum of bytes can be transfered atomically. If the amonut
- * of bytes we want to write to a file (or read from it) exceed this
- * limit we need to send multiple R-messages to the server. This
- * function takes care of doing this.
+ * Sends T-messages to the server until the specified amount of bytes is
+ * read from (or written to) the given file. Multiple T-messages might
+ * need to be transfered to achieve this since the amount of bytes might
+ * exceed the specified msize.
  *
  * @pre t == Twrite || t == Tread
  *
@@ -372,7 +372,7 @@ _9pinit(_9pctx *ctx, iofunc read, iofunc write)
  *
  * The version parameter is always set to the value of `_9P_VERSION`,
  * the msize parameter on the other hand is always set to the value of
- * `_9P_MSIZE`. The msize choosen by the server is stored in the msize
+ * `_9P_MSIZE`. The msize chosen by the server is stored in the msize
  * member of the given connection context.
  *
  * @param ctx 9P connection context.
@@ -565,7 +565,7 @@ _9pstat(_9pctx *ctx, _9pfid *fid, struct stat *buf)
 	buf->st_ctime = buf->st_mtime;
 	ptoh64((uint64_t*)&buf->st_size, &pkt);
 
-	/* information for stat struct we cannot extract from the reply. */
+	/* information that cannot be extracted from the R-message. */
 	buf->st_dev = buf->st_ino = buf->st_rdev = 0;
 	buf->st_nlink = 1;
 	buf->st_uid = buf->st_gid = 0;
@@ -587,7 +587,7 @@ _9pstat(_9pctx *ctx, _9pfid *fid, struct stat *buf)
  *   that refers to the resulting file. Usually, a client maintains a
  *   fid for the root, and navigates by walks from the root fid.
  *
- * This function alsways walks frmom the root fid and returns a fid for
+ * This function always walks from the root fid and returns a fid for
  * the last element of the given path.
  *
  * @attention The 9P protocol specifies that only a a maximum of sixteen
